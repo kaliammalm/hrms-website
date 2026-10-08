@@ -59,7 +59,7 @@ function Employees({ user, selectedCompany, companies, userRole, handleBackToGro
     const fetchEmployees = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch('http://localhost:5000/api/employees', {
+        const response = await fetch('https://hrms-backend-v3.onrender.com/api/employees', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -280,7 +280,7 @@ function Employees({ user, selectedCompany, companies, userRole, handleBackToGro
     setSaveError('');
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/employees/${empId}`, {
+      const response = await fetch(`https://hrms-backend-v3.onrender.com/api/employees/${empId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload),

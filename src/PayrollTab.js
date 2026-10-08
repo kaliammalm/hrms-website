@@ -13,7 +13,7 @@ function PayrollTab({ selectedCompany, onBack }) {
   const fetchEmployees = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/employees?month=${selectedMonth}`, {
+      const response = await fetch(`https://hrms-backend-v3.onrender.com/api/employees?month=${selectedMonth}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       

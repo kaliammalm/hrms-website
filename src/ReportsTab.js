@@ -3,7 +3,7 @@ import { CalendarCheck, Wallet, Users, FileText, FileSpreadsheet, AlertCircle } 
 import { PageHeader } from './ui';
 import { getCompanyBrand } from './brand';
 
-const API = 'http://localhost:5000/api/reports';
+const API = 'https://hrms-backend-v3.onrender.com/api/reports';
 
 const REPORTS = [
   { type: 'attendance', title: 'Attendance summary', icon: <CalendarCheck size={18} />,

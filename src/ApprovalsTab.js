@@ -10,7 +10,7 @@ function ApprovalsTab() {
     const fetchApprovals = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch('http://localhost:5000/api/approvals', {
+        const response = await fetch('https://hrms-backend-v3.onrender.com/api/approvals', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await response.json();
@@ -32,7 +32,7 @@ function ApprovalsTab() {
   const handleAction = async (id, action) => {
     try {
       const token = localStorage.getItem('token');
-      await fetch(`http://localhost:5000/api/approvals/${id}`, {
+      await fetch(`https://hrms-backend-v3.onrender.com/api/approvals/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

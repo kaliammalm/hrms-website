@@ -17,7 +17,7 @@ function CEODashboard({ user, onLogout }) {
     const fetchDashboardStats = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:5000/api/dashboard/stats?companyId=${companyId}`, {
+        const response = await fetch(`https://hrms-backend-v3.onrender.com/api/dashboard/stats?companyId=${companyId}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }

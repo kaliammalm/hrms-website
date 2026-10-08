@@ -26,7 +26,7 @@ export default function CompanyDashboard({ company, onBack, onViewEmployees, onV
       if (!company || !company.id) return;
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:5000/api/companies/${company.id}/stats`, {
+        const response = await fetch(`https://hrms-backend-v3.onrender.com/api/companies/${company.id}/stats`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await response.json();

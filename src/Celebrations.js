@@ -24,7 +24,7 @@ export default function Celebrations({ companyId }) {
       try {
         const token = localStorage.getItem('token');
         const qs = companyId && companyId !== 'all' ? `?companyId=${encodeURIComponent(companyId)}` : '';
-        const res = await fetch(`http://localhost:5000/api/celebrations${qs}`, {
+        const res = await fetch(`https://hrms-backend-v3.onrender.com/api/celebrations${qs}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const body = await res.json().catch(() => ({}));

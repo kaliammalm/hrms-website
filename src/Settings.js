@@ -3,7 +3,7 @@ import { User, Shield, HelpCircle, Save, Briefcase, Phone, KeyRound, CheckCircle
 import { PageHeader, Field, DataItem, StatusPill } from './ui';
 import { getCompanyBrand, CompanyLogo } from './brand';
 
-const API = 'http://localhost:5000/api';
+const API = 'https://hrms-backend-v3.onrender.com/api';
 
 const TABS = [
   { id: 'Profile Settings', label: 'My profile', icon: <User size={16} /> },

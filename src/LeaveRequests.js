@@ -21,12 +21,12 @@ function LeaveRequests({ user, selectedCompany, selectedCompanyId }) {
   // Fetch Leaves Function
   const fetchLeaves = async () => {
     try {
-      let url = 'http://localhost:5000/api/leaves';
+      let url = 'https://hrms-backend-v3.onrender.com/api/leaves';
       
       if (userRole !== 'MD' && userRole !== 'ADMIN') {
         const compIdQuery = selectedCompanyId || user?.company_id || '';
         if (compIdQuery) {
-          url = `http://localhost:5000/api/leaves?companyId=${compIdQuery}`;
+          url = `https://hrms-backend-v3.onrender.com/api/leaves?companyId=${compIdQuery}`;
         }
       }
 
@@ -61,7 +61,7 @@ function LeaveRequests({ user, selectedCompany, selectedCompanyId }) {
 
     try {
       setSubmitting(true);
-      const response = await fetch('http://localhost:5000/api/leaves', {
+      const response = await fetch('https://hrms-backend-v3.onrender.com/api/leaves', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

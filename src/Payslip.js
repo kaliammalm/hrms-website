@@ -12,7 +12,7 @@ function Payslip({ user }) {
       let apiPayslips = [];
       const token = localStorage.getItem('token') || localStorage.getItem('authToken') || localStorage.getItem('access_token') || '';
       
-      const response = await fetch('http://localhost:5000/api/payslips', {
+      const response = await fetch('https://hrms-backend-v3.onrender.com/api/payslips', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -90,7 +90,7 @@ function Payslip({ user }) {
   const handleDownloadPDF = async (payslip) => {
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('authToken') || localStorage.getItem('access_token') || '';
-      const response = await fetch(`http://localhost:5000/api/payslips/download/${payslip.id}`, {
+      const response = await fetch(`https://hrms-backend-v3.onrender.com/api/payslips/download/${payslip.id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 

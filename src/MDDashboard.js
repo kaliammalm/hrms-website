@@ -207,7 +207,7 @@ function MDDashboard({ user, onLogout }) {
       const compIdParam = selectedCompanyName === 'All Companies' ? 'all' : getSelectedCompanyId();
 
       try {
-        const attRes = await fetch(`http://localhost:5000/api/attendance?companyId=${compIdParam}`, {
+        const attRes = await fetch(`https://hrms-backend-v3.onrender.com/api/attendance?companyId=${compIdParam}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const attData = await attRes.json();
@@ -216,7 +216,7 @@ function MDDashboard({ user, onLogout }) {
         }
 
         if (['HR', 'MD', 'CEO', 'ADMIN'].includes(userRole)) {
-          const leaveRes = await fetch(`http://localhost:5000/api/leaves?companyId=${compIdParam}`, {
+          const leaveRes = await fetch(`https://hrms-backend-v3.onrender.com/api/leaves?companyId=${compIdParam}`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           const leaveData = await leaveRes.json();
@@ -243,7 +243,7 @@ function MDDashboard({ user, onLogout }) {
       if (!token) return;
 
       const compIdParam = selectedCompanyName === 'All Companies' ? '' : getSelectedCompanyId();
-      const statsUrl = compIdParam ? `http://localhost:5000/api/dashboard/stats?companyId=${compIdParam}` : 'http://localhost:5000/api/dashboard/stats';
+      const statsUrl = compIdParam ? `https://hrms-backend-v3.onrender.com/api/dashboard/stats?companyId=${compIdParam}` : 'https://hrms-backend-v3.onrender.com/api/dashboard/stats';
 
       try {
         const res = await fetch(statsUrl, {
@@ -282,7 +282,7 @@ function MDDashboard({ user, onLogout }) {
       }
       const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 
-      const response = await fetch('http://localhost:5000/api/attendance/mark', {
+      const response = await fetch('https://hrms-backend-v3.onrender.com/api/attendance/mark', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -339,7 +339,7 @@ function MDDashboard({ user, onLogout }) {
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
     const token = localStorage.getItem('token');
 
-    fetch(`http://localhost:5000/api/attendance/checkout/${id}`, {
+    fetch(`https://hrms-backend-v3.onrender.com/api/attendance/checkout/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -360,7 +360,7 @@ function MDDashboard({ user, onLogout }) {
     if (!token) return;
     setLeavesLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/leaves?mine=1', {
+      const res = await fetch('https://hrms-backend-v3.onrender.com/api/leaves?mine=1', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json().catch(() => null);
@@ -393,7 +393,7 @@ function MDDashboard({ user, onLogout }) {
     setLeaveSubmitting(true);
     setLeaveFormError('');
     try {
-      const res = await fetch('http://localhost:5000/api/leaves', {
+      const res = await fetch('https://hrms-backend-v3.onrender.com/api/leaves', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -423,7 +423,7 @@ function MDDashboard({ user, onLogout }) {
     const previous = allLeaves;
     setAllLeaves(list => list.map(l => l.id === leaveId ? { ...l, status: newStatus } : l));
     try {
-      const res = await fetch(`http://localhost:5000/api/leaves/${leaveId}`, {
+      const res = await fetch(`https://hrms-backend-v3.onrender.com/api/leaves/${leaveId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

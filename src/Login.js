@@ -14,7 +14,7 @@ function Login({ onLogin }) {
 
     try {
       const API_BASE = process.env.REACT_APP_API_URL || 'https://hrms-backend-v3.onrender.com';
-      const response = await fetch(`${API_BASE}/auth/login`, {
+      const response = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })

@@ -13,7 +13,7 @@ function Login({ onLogin }) {
     setError('');
 
     try {
-      const API_BASE = `http://${window.location.hostname}:5000`;
+      const API_BASE = process.env.REACT_APP_API_URL || 'https://hrms-backend-v3.onrender.com';
       const response = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -35,7 +35,7 @@ function Login({ onLogin }) {
 
         const userData = data.user || data; 
         const resolvedUserId = userData.id || userData.user_id || userData.employee_id;
-        console.log("user data",userData)
+        console.log("user data", userData);
 
         localStorage.setItem('user', JSON.stringify({
           id: resolvedUserId,

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Check, X, CheckCircle2 } from 'lucide-react';
 import { PageHeader, Panel, EmptyState, Avatar, StatusPill } from './ui';
+import { API_BASE } from './config';
 
 function ApprovalsTab() {
   const [approvals, setApprovals] = useState([]);
@@ -10,7 +11,7 @@ function ApprovalsTab() {
     const fetchApprovals = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch('https://hrms-backend-v3.onrender.com/api/approvals', {
+        const response = await fetch(`${API_BASE}/api/approvals`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await response.json();
@@ -32,7 +33,7 @@ function ApprovalsTab() {
   const handleAction = async (id, action) => {
     try {
       const token = localStorage.getItem('token');
-      await fetch(`https://hrms-backend-v3.onrender.com/api/approvals/${id}`, {
+      await fetch(`${API_BASE}/api/approvals/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

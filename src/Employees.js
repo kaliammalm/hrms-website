@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ArrowLeft, Briefcase, User, CreditCard, Camera, Edit2, Save, X, Search, Eye, Wallet, Shield, Users, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { PageHeader, Panel, EmptyState, TableEmpty, Avatar, StatusPill, Field, DataItem } from './ui';
+import { API_BASE } from './config';
 
 function Employees({ user, selectedCompany, companies, userRole, handleBackToGroupOverview }) {
   const [employees, setEmployees] = useState([]);
@@ -59,7 +60,7 @@ function Employees({ user, selectedCompany, companies, userRole, handleBackToGro
     const fetchEmployees = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch('https://hrms-backend-v3.onrender.com/api/employees', {
+        const response = await fetch(`${API_BASE}/api/employees`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -280,7 +281,7 @@ function Employees({ user, selectedCompany, companies, userRole, handleBackToGro
     setSaveError('');
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`https://hrms-backend-v3.onrender.com/api/employees/${empId}`, {
+      const response = await fetch(`${API_BASE}/api/employees/${empId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload),

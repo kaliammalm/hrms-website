@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from './config';
 
 const Attendance = () => {
   const [attendanceList, setAttendanceList] = useState([]);
@@ -24,7 +25,7 @@ const Attendance = () => {
         return;
       }
 
-      const response = await fetch('https://hrms-backend-v3.onrender.com/api/attendance', {
+      const response = await fetch(`${API_BASE}/api/attendance`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -95,7 +96,7 @@ const Attendance = () => {
       const token = localStorage.getItem('token');
       const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 
-      const response = await fetch('https://hrms-backend-v3.onrender.com/api/attendance/mark', {
+      const response = await fetch(`${API_BASE}/api/attendance/mark`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -129,7 +130,7 @@ const Attendance = () => {
       const token = localStorage.getItem('token');
       const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 
-      const response = await fetch(`https://hrms-backend-v3.onrender.com/api/attendance/checkout/${attendanceId}`, {
+      const response = await fetch(`${API_BASE}/api/attendance/checkout/${attendanceId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

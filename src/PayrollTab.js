@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Wallet, Users, CheckCircle2, Clock, PlayCircle, Pencil, FileText } from 'lucide-react';
 import { PageHeader, Panel, KpiStrip, Kpi, StatusPill, Avatar, TableEmpty, Modal, Field, formatINR } from './ui';
+import { API_BASE } from './config';
 
 function PayrollTab({ selectedCompany, onBack }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -13,7 +14,7 @@ function PayrollTab({ selectedCompany, onBack }) {
   const fetchEmployees = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`https://hrms-backend-v3.onrender.com/api/employees?month=${selectedMonth}`, {
+      const response = await fetch(`${API_BASE}/api/employees?month=${selectedMonth}&include=payroll`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       

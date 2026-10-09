@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Eye, Download, FileText, Lock } from 'lucide-react';
 import { PageHeader, Panel, StatusPill, TableEmpty, Modal } from './ui';
+import { API_BASE } from './config';
+import { saveFile } from './fileSaver';
 
 function Payslip({ user }) {
   const currentCompany = user?.company_name || user?.company || 'your company';
@@ -12,7 +14,7 @@ function Payslip({ user }) {
       let apiPayslips = [];
       const token = localStorage.getItem('token') || localStorage.getItem('authToken') || localStorage.getItem('access_token') || '';
       
-      const response = await fetch('https://hrms-backend-v3.onrender.com/api/payslips', {
+      const response = await fetch(`${API_BASE}/api/payslips`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -90,7 +92,7 @@ function Payslip({ user }) {
   const handleDownloadPDF = async (payslip) => {
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('authToken') || localStorage.getItem('access_token') || '';
-      const response = await fetch(`https://hrms-backend-v3.onrender.com/api/payslips/download/${payslip.id}`, {
+      const response = await fetch(`${API_BASE}/api/payslips/download/${payslip.id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -100,14 +102,7 @@ function Payslip({ user }) {
       }
 
       const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `Payslip_${payslip.month.replace(/\s+/g, '_')}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      await saveFile(blob, `Payslip_${payslip.month.replace(/\s+/g, '_')}.csv`);
     } catch (err) {
       console.error('Error downloading:', err);
       alert(`Downloading payslip for ${payslip.month}...`);

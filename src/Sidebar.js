@@ -61,9 +61,9 @@ function Sidebar({ activeMenu, setActiveMenu, userRole, activeCompanyDashboard, 
 
       <aside className={`hr-sidebar${mobileOpen ? ' is-open' : ''}`} data-brand={brand || 'group'} aria-label="Main navigation">
         <div className="hr-brand">
-          <div className="hr-brand-mark">H</div>
+          <div className="hr-brand-mark">R</div>
           <div style={{ minWidth: 0 }}>
-            <div className="hr-brand-name">HRMS Portal</div>
+            <div className="hr-brand-name">RRD Group</div>
             <div className="hr-brand-sub">Group workforce</div>
           </div>
         </div>

@@ -3,6 +3,7 @@ import { ArrowLeft, Users, UserCheck, CalendarOff, Wallet, CalendarCheck, Chevro
 import { PageHeader, Panel, KpiStrip, Kpi, EmptyState, StatusPill, formatINR } from './ui';
 import { getCompanyBrand, CompanyLogo } from './brand';
 import Celebrations from './Celebrations';
+import { API_BASE } from './config';
 
 export default function CompanyDashboard({ company, onBack, onViewEmployees, onViewAttendance, onViewPayroll, userRole }) {
   const [stats, setStats] = useState({
@@ -26,7 +27,7 @@ export default function CompanyDashboard({ company, onBack, onViewEmployees, onV
       if (!company || !company.id) return;
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`https://hrms-backend-v3.onrender.com/api/companies/${company.id}/stats`, {
+        const response = await fetch(`${API_BASE}/api/companies/${company.id}/stats`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await response.json();

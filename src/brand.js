@@ -15,7 +15,7 @@ export const COMPANY_BRANDS = {
     legalName: 'Ram Reddy Developers',
     logo: rrdLogo,          // horizontal lockup (mark + wordmark)
     logoCompact: rrdLogo,
-    ceo: 'Vasumathi',
+    ceo: null,              // Vasumathi is now group CFO (all companies)
     status: 'active',
   },
   2: {

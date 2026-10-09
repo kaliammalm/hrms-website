@@ -29,7 +29,9 @@ import ApprovalsTab from './ApprovalsTab';
 import Payslips from './Payslip';
 import Celebrations from './Celebrations';
 import { getCompanyBrand } from './brand';
+import { getEffectiveRole, getRoleLabel, canAccessMenu } from './access';
 import { Panel, EmptyState, Restricted, PageHeader } from './ui';
+import { API_BASE } from './config';
 
 const COMPANIES_LIST = [
   { id: 1, name: 'Ram Reddy Developers', code: 'RRD', tag: 'INFRA', description: 'Real estate development and construction infrastructure.', color: '#2563eb', logoBg: '#eff6ff' },
@@ -38,7 +40,8 @@ const COMPANIES_LIST = [
 ];
 
 function MDDashboard({ user, onLogout }) {
-  const userRole = user?.role ? user.role.toUpperCase() : 'EMPLOYEE';
+  // 'MD' for anyone with group access (MD account, Vasumathi); otherwise their own role
+  const userRole = getEffectiveRole(user);
   const userCompanyId = user?.company_id || user?.companyId || 3;
   const employeeId = user?.id || 1;
 
@@ -207,7 +210,7 @@ function MDDashboard({ user, onLogout }) {
       const compIdParam = selectedCompanyName === 'All Companies' ? 'all' : getSelectedCompanyId();
 
       try {
-        const attRes = await fetch(`https://hrms-backend-v3.onrender.com/api/attendance?companyId=${compIdParam}`, {
+        const attRes = await fetch(`${API_BASE}/api/attendance?companyId=${compIdParam}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const attData = await attRes.json();
@@ -216,7 +219,7 @@ function MDDashboard({ user, onLogout }) {
         }
 
         if (['HR', 'MD', 'CEO', 'ADMIN'].includes(userRole)) {
-          const leaveRes = await fetch(`https://hrms-backend-v3.onrender.com/api/leaves?companyId=${compIdParam}`, {
+          const leaveRes = await fetch(`${API_BASE}/api/leaves?companyId=${compIdParam}`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           const leaveData = await leaveRes.json();
@@ -243,7 +246,7 @@ function MDDashboard({ user, onLogout }) {
       if (!token) return;
 
       const compIdParam = selectedCompanyName === 'All Companies' ? '' : getSelectedCompanyId();
-      const statsUrl = compIdParam ? `https://hrms-backend-v3.onrender.com/api/dashboard/stats?companyId=${compIdParam}` : 'https://hrms-backend-v3.onrender.com/api/dashboard/stats';
+      const statsUrl = compIdParam ? `${API_BASE}/api/dashboard/stats?companyId=${compIdParam}` : `${API_BASE}/api/dashboard/stats`;
 
       try {
         const res = await fetch(statsUrl, {
@@ -282,7 +285,7 @@ function MDDashboard({ user, onLogout }) {
       }
       const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 
-      const response = await fetch('https://hrms-backend-v3.onrender.com/api/attendance/mark', {
+      const response = await fetch(`${API_BASE}/api/attendance/mark`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -321,6 +324,20 @@ function MDDashboard({ user, onLogout }) {
       return;
     }
 
+    // Approved On-Duty / Work From Home today: no site location needed (the server checks the approval)
+    const localToday = new Date().toLocaleDateString('en-CA');
+    const remoteToday = (myLeaves || []).some((l) => {
+      const t = String(l.leave_type || l.type || '').toUpperCase();
+      const isRemote = /\bWFH\b|WORK\s*FROM\s*HOME|\bOD\b|ON[\s-]*DUTY/.test(t);
+      const from = String(l.from_date || l.fromDate || '').slice(0, 10);
+      const to = String(l.to_date || l.toDate || '').slice(0, 10);
+      return isRemote && l.status === 'Approved' && from <= localToday && localToday <= to;
+    });
+    if (remoteToday) {
+      await sendAttendanceRequest(userCompanyId, userRole, null, null);
+      return;
+    }
+
     if (!navigator.geolocation) {
       alert('Geolocation is not supported by your browser');
       return;
@@ -339,7 +356,7 @@ function MDDashboard({ user, onLogout }) {
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
     const token = localStorage.getItem('token');
 
-    fetch(`https://hrms-backend-v3.onrender.com/api/attendance/checkout/${id}`, {
+    fetch(`${API_BASE}/api/attendance/checkout/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -360,7 +377,7 @@ function MDDashboard({ user, onLogout }) {
     if (!token) return;
     setLeavesLoading(true);
     try {
-      const res = await fetch('https://hrms-backend-v3.onrender.com/api/leaves?mine=1', {
+      const res = await fetch(`${API_BASE}/api/leaves?mine=1`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json().catch(() => null);
@@ -393,7 +410,7 @@ function MDDashboard({ user, onLogout }) {
     setLeaveSubmitting(true);
     setLeaveFormError('');
     try {
-      const res = await fetch('https://hrms-backend-v3.onrender.com/api/leaves', {
+      const res = await fetch(`${API_BASE}/api/leaves`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -423,7 +440,7 @@ function MDDashboard({ user, onLogout }) {
     const previous = allLeaves;
     setAllLeaves(list => list.map(l => l.id === leaveId ? { ...l, status: newStatus } : l));
     try {
-      const res = await fetch(`https://hrms-backend-v3.onrender.com/api/leaves/${leaveId}`, {
+      const res = await fetch(`${API_BASE}/api/leaves/${leaveId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -493,14 +510,19 @@ function MDDashboard({ user, onLogout }) {
   const menuItems = getMenuItems();
 
   const renderMainContent = () => {
-    // If regular employee tries to access MD-only screens, block and show dashboard/payslips securely
-    const isRegularUser = ['EMPLOYEE', 'SITE_ENGINEER', 'SALES EXECUTIVE', 'ACCOUNTANT'].includes(userRole);
-    if (isRegularUser && ['Companies', 'Employees', 'Payroll', 'Recruitment', 'Performance', 'Reports', 'Approvals'].includes(activeMenu)) {
+    // Route guard: every screen is checked against the role's allowed screens (see access.js),
+    // so a saved menu, an old link or a notification can never open a screen the role may not use.
+    if (!canAccessMenu(userRole, activeMenu)) {
       return (
-        <Restricted
-          title="Access restricted"
-          text="This section is available to administrative roles only. Contact HR if you need access."
-        />
+        <div>
+          <Restricted
+            title="Access restricted"
+            text="This section isn't available for your role. Contact your administrator if you need access."
+          />
+          <button type="button" className="hr-btn hr-btn-secondary" style={{ marginTop: 12 }} onClick={() => handleMenuChange('Dashboard')}>
+            Go to dashboard
+          </button>
+        </div>
       );
     }
 
@@ -725,6 +747,7 @@ function MDDashboard({ user, onLogout }) {
           companies={companies}
           user={user}
           userRole={userRole}
+          roleLabel={getRoleLabel(user)}
           onLogout={onLogout}
           setActiveMenu={handleMenuChange}
           setActiveTab={setActiveSettingsTab}

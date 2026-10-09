@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Menu, LogOut, ChevronDown, User, Shield, HelpCircle } from 'lucide-react';
 import { getCompanyBrand, CompanyLogo } from './brand';
+import NotificationBell from './NotificationBell';
 
-function Header({ selectedCompany, setSelectedCompany, companies = [], user, userRole, onLogout, setActiveMenu, setActiveTab, companyName, onToggleSidebar }) {
+function Header({ selectedCompany, setSelectedCompany, companies = [], user, userRole, roleLabel, onLogout, setActiveMenu, setActiveTab, companyName, onToggleSidebar }) {
   const isMD = userRole && userRole.toUpperCase() === 'MD';
 
   const getEmployeeCompany = () => {
@@ -137,6 +138,7 @@ function Header({ selectedCompany, setSelectedCompany, companies = [], user, use
       </div>
 
       <div className="hr-topbar-right">
+        <NotificationBell userId={user?.id} onNavigate={setActiveMenu} />
         <div className="hr-profile" ref={menuRef}>
           <button
             type="button"
@@ -149,7 +151,7 @@ function Header({ selectedCompany, setSelectedCompany, companies = [], user, use
             {renderAvatar(34)}
             <span className="hr-user-meta">
               <span className="hr-user-name">{displayName}</span>
-              <span className="hr-user-role">{userRole}</span>
+              <span className="hr-user-role">{roleLabel || userRole}</span>
             </span>
             <ChevronDown size={15} className="hr-user-chev hr-hide-sm" />
           </button>
@@ -172,7 +174,7 @@ function Header({ selectedCompany, setSelectedCompany, companies = [], user, use
                   <div className="hr-popover-name" title={displayName} style={{ fontWeight: '600', fontSize: '15px' }}>{displayName}</div>
                   {displayEmail && <div className="hr-popover-email" title={displayEmail} style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '2px' }}>{displayEmail}</div>}
                   <div style={{ marginTop: '8px' }}>
-                    <span className="hr-role-badge">{userRole}</span>
+                    <span className="hr-role-badge">{roleLabel || userRole}</span>
                   </div>
                 </div>
               </div>

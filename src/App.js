@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import MDDashboard from './MDDashboard';
 import Login from './Login';
+import { API_BASE } from './config';
 
 // One-time clean start: payroll runs made during testing were stored in the browser
 // (payroll_<company>_<month>) and keep generating payslips. Clear them once per browser.
@@ -57,13 +58,33 @@ function App() {
   }, [user]);
 
 
+  // Refresh the signed-in user's role and access from the server on every load/login,
+  // so access changes (e.g. group MD access) apply without signing out.
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    let alive = true;
+    fetch(`${API_BASE}/api/auth/me`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body) => {
+        if (!alive || !body?.user) return;
+        setUser((prev) => {
+          const fresh = { ...prev, ...body.user };
+          if (JSON.stringify(fresh) === JSON.stringify(prev)) return prev;
+          localStorage.setItem('user', JSON.stringify(fresh));
+          return fresh;
+        });
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [user?.id]);
+
   if (!user) {
     return <Login onLogin={handleLogin} />;
   }
 
   return (
     <div>
-      <MDDashboard user={user} onLogout={handleLogout} />
+      <MDDashboard key={`${user.id}-${user.group_access ? 'group' : 'own'}`} user={user} onLogout={handleLogout} />
     </div>
   );
 }

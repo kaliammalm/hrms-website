@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Lock, ShieldCheck, ArrowRight, AlertCircle } from 'lucide-react';
+import { API_BASE } from './config';
 
 function Login({ onLogin }) {
   const [email, setEmail] = useState('');
@@ -13,7 +14,6 @@ function Login({ onLogin }) {
     setError('');
 
     try {
-      const API_BASE = process.env.REACT_APP_API_URL || 'https://hrms-backend-v3.onrender.com';
       const response = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -7,6 +7,7 @@
    ========================================================================== */
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { saveFile } from './fileSaver';
 
 const INK = [19, 33, 59];
 const MUTED = [98, 110, 132];
@@ -133,8 +134,9 @@ export function buildReportPdf(report, { brandKey = 'group' } = {}) {
   return doc;
 }
 
-export function downloadReportPdf(report, opts) {
+export async function downloadReportPdf(report, opts) {
   const doc = buildReportPdf(report, opts);
   const slug = (report.scopeLabel || 'All Companies').replace(/[^A-Za-z0-9]+/g, '_');
-  doc.save(`${report.filename || 'Report'}_${slug}.pdf`);
+  // saveFile works in the browser and in the Android app (share sheet)
+  await saveFile(doc.output('blob'), `${report.filename || 'Report'}_${slug}.pdf`);
 }

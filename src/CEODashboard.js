@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from './config';
 
 function CEODashboard({ user, onLogout }) {
   const companyName = user?.companyName || user?.company_name || 'Ram Reddy Developers';
@@ -17,7 +18,7 @@ function CEODashboard({ user, onLogout }) {
     const fetchDashboardStats = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`https://hrms-backend-v3.onrender.com/api/dashboard/stats?companyId=${companyId}`, {
+        const response = await fetch(`${API_BASE}/api/dashboard/stats?companyId=${companyId}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }

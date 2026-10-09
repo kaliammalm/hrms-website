@@ -2,8 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { User, Shield, HelpCircle, Save, Briefcase, Phone, KeyRound, CheckCircle2, AlertCircle, Building2 } from 'lucide-react';
 import { PageHeader, Field, DataItem, StatusPill } from './ui';
 import { getCompanyBrand, CompanyLogo } from './brand';
+import { API_BASE } from './config';
 
-const API = 'https://hrms-backend-v3.onrender.com/api';
+const API = `${API_BASE}/api`;
 
 const TABS = [
   { id: 'Profile Settings', label: 'My profile', icon: <User size={16} /> },

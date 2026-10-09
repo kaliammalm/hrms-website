@@ -686,3 +686,8 @@ button.hr-list-row:hover { background: var(--surface-2); color: var(--ink); }
 .hr-form-alert.is-success { border-color: #bfe3cf; background: var(--success-bg); color: var(--success); }
 .hr-form-alert.is-warning { border-color: #f0dca8; background: #fdf8ea; color: #7a5a06; }
 .hr-incomplete { display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; background: #fdf3dc; color: #8a6206; vertical-align: 1px; }
+
+/* On-Duty / Work From Home request type tags */
+.hr-req-type { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.hr-req-type.is-wfh { background: #e8f1fd; color: #1d4f91; }
+.hr-req-type.is-od { background: #efeafd; color: #4b2c94; }

@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { CalendarCheck, Wallet, Users, FileText, FileSpreadsheet, AlertCircle } from 'lucide-react';
 import { PageHeader } from './ui';
 import { getCompanyBrand } from './brand';
+import { API_BASE } from './config';
+import { saveFile } from './fileSaver';
 
-const API = 'https://hrms-backend-v3.onrender.com/api/reports';
+const API = `${API_BASE}/api/reports`;
 
 const REPORTS = [
   { type: 'attendance', title: 'Attendance summary', icon: <CalendarCheck size={18} />,
@@ -50,18 +52,11 @@ function ReportsTab({ companyId, selectedCompany }) {
         const blob = await res.blob();
         const cd = res.headers.get('Content-Disposition') || '';
         const name = (cd.match(/filename="?([^";]+)"?/) || [])[1] || `${type}_${month}.csv`;
-        const href = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = href;
-        a.download = name;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(href);
+        await saveFile(blob, name);
       } else {
         const report = await res.json();
         const { downloadReportPdf } = await import('./reportPdf');
-        downloadReportPdf(report, { brandKey });
+        await downloadReportPdf(report, { brandKey });
       }
     } catch (e) {
       const title = REPORTS.find((r) => r.type === type)?.title || 'Report';

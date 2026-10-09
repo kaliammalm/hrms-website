@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Gift, Award } from 'lucide-react';
+import CelebrationCard from './CelebrationCard';
 import { Panel, EmptyState } from './ui';
+import { API_BASE } from './config';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -15,6 +17,7 @@ export default function Celebrations({ companyId }) {
   const [data, setData] = useState({ events: [], month: new Date().getMonth() + 1, today: new Date().getDate() });
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const [openEvent, setOpenEvent] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -24,7 +27,7 @@ export default function Celebrations({ companyId }) {
       try {
         const token = localStorage.getItem('token');
         const qs = companyId && companyId !== 'all' ? `?companyId=${encodeURIComponent(companyId)}` : '';
-        const res = await fetch(`https://hrms-backend-v3.onrender.com/api/celebrations${qs}`, {
+        const res = await fetch(`${API_BASE}/api/celebrations${qs}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const body = await res.json().catch(() => ({}));
@@ -51,7 +54,7 @@ export default function Celebrations({ companyId }) {
       className="hr-section-gap hr-fill"
       icon={<Gift size={18} strokeWidth={1.75} style={{ color: 'var(--muted)' }} />}
       title={`Celebrations in ${monthName}`}
-      subtitle="Birthdays and work anniversaries this month"
+      subtitle="Birthdays and work anniversaries this month · tap one to send wishes"
       actions={!loading && events.length > 0 ? <span className="hr-count">{events.length} this month</span> : null}
     >
       <div className="hr-fill-body">
@@ -73,13 +76,19 @@ export default function Celebrations({ companyId }) {
               const isPast = item.day < data.today;
               const accent = isBirthday ? '#b4366b' : 'var(--primary)';
               return (
-                <div key={item.id} className={`hr-list-row hr-celebration${isPast ? ' is-past' : ''}${isToday ? ' is-today' : ''}`}>
+                <button
+                  type="button"
+                  key={item.id}
+                  className={`hr-list-row hr-celebration is-clickable${isPast ? ' is-past' : ''}${isToday ? ' is-today' : ''}`}
+                  onClick={() => setOpenEvent(item)}
+                  aria-label={`${isBirthday ? 'Birthday' : 'Work anniversary'} of ${item.name}, ${monthShort} ${item.day}. Open greeting card`}
+                >
                   <div className="hr-date-tile">
                     <div className="hr-date-tile-m" style={{ background: accent }}>{monthShort}</div>
                     <div className="hr-date-tile-d">{item.day}</div>
                   </div>
                   <div className="hr-list-main">
-                    <div className="hr-list-title">{item.name}</div>
+                    <div className="hr-list-title">{item.name}{item.isMe ? ' (you)' : ''}</div>
                     <div className="hr-list-sub">
                       {item.companyName}
                       {!isBirthday && item.years ? ` · ${item.years} ${item.years === 1 ? 'year' : 'years'}` : ''}
@@ -95,12 +104,15 @@ export default function Celebrations({ companyId }) {
                       {isBirthday ? 'Birthday' : 'Anniversary'}
                     </span>
                   )}
-                </div>
+                </button>
               );
             })}
           </div>
         )}
       </div>
+      {openEvent && (
+        <CelebrationCard event={openEvent} month={data.month} today={data.today} onClose={() => setOpenEvent(null)} />
+      )}
     </Panel>
   );
 }

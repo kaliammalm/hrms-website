@@ -1,6 +1,35 @@
 import React, { useEffect } from 'react';
-import { Plus, Check, X, CalendarDays, AlertCircle } from 'lucide-react';
+import { Plus, Check, X, CalendarDays, AlertCircle, Briefcase, House } from 'lucide-react';
 import { PageHeader, Panel, StatusPill, Avatar, TableEmpty, Modal, Field } from './ui';
+
+// Request types. On-Duty and Work From Home use the same approval flow as leave,
+// but count as working days (not leave) in reports and dashboards.
+const REQUEST_GROUPS = [
+  { label: 'Leave', options: ['Casual Leave (CL)', 'Sick Leave', 'Emergency Leave'] },
+  { label: 'Working away from the office', options: ['On Duty (OD)', 'Work From Home (WFH)'] },
+];
+const requestKind = (type) => {
+  const t = String(type || '').toUpperCase();
+  if (/\bWFH\b|WORK\s*FROM\s*HOME/.test(t)) return 'wfh';
+  if (/\bOD\b|ON[\s-]*DUTY/.test(t)) return 'od';
+  return 'leave';
+};
+const REASON_HINT = {
+  leave: 'Briefly explain why you need this leave',
+  od: 'Where you will be working and the purpose (e.g. client meeting at site, bank visit)',
+  wfh: 'Why you need to work from home and what you will be working on',
+};
+
+function TypeCell({ type }) {
+  const label = type || 'Casual Leave (CL)';
+  const kind = requestKind(label);
+  if (kind === 'leave') return <span>{label}</span>;
+  return (
+    <span className={`hr-req-type is-${kind}`}>
+      {kind === 'wfh' ? <House size={13} /> : <Briefcase size={13} />} {label}
+    </span>
+  );
+}
 
 function LeaveManagementTab({
   user,
@@ -59,11 +88,11 @@ function LeaveManagementTab({
   return (
     <div>
       <PageHeader
-        title={isMD ? 'Leave approvals' : 'Leave requests'}
-        subtitle={isMD ? 'Review and decide on leave requests from across the group.' : 'Apply for leave and track the status of your requests.'}
+        title={isMD ? 'Leave approvals' : 'Leave & attendance requests'}
+        subtitle={isMD ? 'Review and decide on leave, On-Duty and Work From Home requests from across the group.' : 'Apply for leave, On-Duty (OD) or Work From Home (WFH) and track the status of your requests.'}
         actions={canApplyLeave && (
           <button type="button" className="hr-btn hr-btn-primary" onClick={openForm}>
-            <Plus size={16} /> Apply for leave
+            <Plus size={16} /> New request
           </button>
         )}
       />
@@ -92,7 +121,7 @@ function LeaveManagementTab({
               </thead>
               <tbody>
                 {leavesLoading && (!myLeaves || myLeaves.length === 0) ? (
-                  <TableEmpty colSpan={5} icon={<CalendarDays size={20} />} title="Loading your leave requests" text="Fetching your requests from the server…" />
+                  <TableEmpty colSpan={5} icon={<CalendarDays size={20} />} title="Loading your requests" text="Fetching your requests from the server…" />
                 ) : leavesError && (!myLeaves || myLeaves.length === 0) ? (
                   <tr>
                     <td colSpan={5}>
@@ -106,13 +135,13 @@ function LeaveManagementTab({
                   <TableEmpty
                     colSpan={5}
                     icon={<CalendarDays size={20} />}
-                    title="No leave requests yet"
-                    text="When you apply for leave, your requests and their approval status show up here."
+                    title="No requests yet"
+                    text="Leave, On-Duty and Work From Home requests you submit, and their approval status, show up here."
                   />
                 ) : (
                   myLeaves.map(l => (
                     <tr key={l.id || l._id}>
-                      <td className="is-strong">{l.type || l.leave_type || 'Casual Leave (CL)'}</td>
+                      <td className="is-strong"><TypeCell type={l.type || l.leave_type} /></td>
                       <td className="num">{formatDate(l.start_date || l.from_date || l.fromDate || l.from)}</td>
                       <td className="num">{formatDate(l.end_date || l.to_date || l.toDate || l.to)}</td>
                       <td><div className="hr-truncate" title={l.reason || ''}>{l.reason || '-'}</div></td>
@@ -157,7 +186,7 @@ function LeaveManagementTab({
                           </div>
                         </td>
                         <td className="is-muted" style={{ whiteSpace: 'nowrap' }}>{compName}</td>
-                        <td className="is-strong" style={{ whiteSpace: 'nowrap' }}>{l.type || l.leave_type || 'Casual Leave (CL)'}</td>
+                        <td className="is-strong" style={{ whiteSpace: 'nowrap' }}><TypeCell type={l.type || l.leave_type} /></td>
                         <td className="num">{formatDate(l.start_date || l.from_date || l.fromDate || l.from)}</td>
                         <td className="num">{formatDate(l.end_date || l.to_date || l.toDate || l.to)}</td>
                         <td className="is-muted"><div className="hr-truncate" style={{ maxWidth: 160 }} title={l.reason || ''}>{l.reason || '-'}</div></td>
@@ -184,7 +213,12 @@ function LeaveManagementTab({
 
       {/* Leave Application Form Modal */}
       {showLeaveModal && (
-        <Modal title="Apply for leave" subtitle="Your manager will be notified once you submit.">
+        <Modal
+          title={requestKind(leaveType) === 'wfh' ? 'Request Work From Home' : requestKind(leaveType) === 'od' ? 'Request On-Duty' : 'Apply for leave'}
+          subtitle={requestKind(leaveType) === 'leave'
+            ? 'Your manager will be notified once you submit.'
+            : 'Counts as a working day, not leave. Once approved, you can check in from anywhere on those dates.'}
+        >
           <form onSubmit={handleApplyLeave}>
             <div className="hr-modal-body">
               {leaveFormError && (
@@ -192,11 +226,13 @@ function LeaveManagementTab({
                   <AlertCircle size={16} /> <div>{leaveFormError}</div>
                 </div>
               )}
-              <Field label="Leave type">
+              <Field label="Request type">
                 <select className="hr-select" value={leaveType} onChange={(e) => setLeaveType(e.target.value)}>
-                  <option value="Casual Leave (CL)">Casual Leave (CL)</option>
-                  <option value="Sick Leave">Sick Leave</option>
-                  <option value="Emergency Leave">Emergency Leave</option>
+                  {REQUEST_GROUPS.map((g) => (
+                    <optgroup key={g.label} label={g.label}>
+                      {g.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                    </optgroup>
+                  ))}
                 </select>
               </Field>
 
@@ -210,7 +246,7 @@ function LeaveManagementTab({
               </div>
 
               <Field label="Reason">
-                <textarea className="hr-textarea" rows="3" required placeholder="Briefly explain why you need this leave" value={leaveReason} onChange={(e) => setLeaveReason(e.target.value)} />
+                <textarea className="hr-textarea" rows="3" required placeholder={REASON_HINT[requestKind(leaveType)]} value={leaveReason} onChange={(e) => setLeaveReason(e.target.value)} />
               </Field>
             </div>
 

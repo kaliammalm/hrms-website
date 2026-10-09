@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from './config';
 
 function LeaveRequests({ user, selectedCompany, selectedCompanyId }) {
   const userRole = (user?.role || '').toUpperCase();
@@ -21,12 +22,12 @@ function LeaveRequests({ user, selectedCompany, selectedCompanyId }) {
   // Fetch Leaves Function
   const fetchLeaves = async () => {
     try {
-      let url = 'https://hrms-backend-v3.onrender.com/api/leaves';
+      let url = `${API_BASE}/api/leaves`;
       
       if (userRole !== 'MD' && userRole !== 'ADMIN') {
         const compIdQuery = selectedCompanyId || user?.company_id || '';
         if (compIdQuery) {
-          url = `https://hrms-backend-v3.onrender.com/api/leaves?companyId=${compIdQuery}`;
+          url = `${API_BASE}/api/leaves?companyId=${compIdQuery}`;
         }
       }
 
@@ -61,7 +62,7 @@ function LeaveRequests({ user, selectedCompany, selectedCompanyId }) {
 
     try {
       setSubmitting(true);
-      const response = await fetch('https://hrms-backend-v3.onrender.com/api/leaves', {
+      const response = await fetch(`${API_BASE}/api/leaves`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

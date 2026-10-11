@@ -28,6 +28,8 @@ import ReportsTab from './ReportsTab';
 import ApprovalsTab from './ApprovalsTab';
 import Payslips from './Payslip';
 import Celebrations from './Celebrations';
+import FieldVisits, { FieldTodayCard } from './field/FieldVisits';
+import FieldTracking from './field/FieldTracking';
 import { getCompanyBrand } from './brand';
 import { getEffectiveRole, getRoleLabel, canAccessMenu } from './access';
 import { Panel, EmptyState, Restricted, PageHeader } from './ui';
@@ -46,6 +48,8 @@ function MDDashboard({ user, onLogout }) {
   const employeeId = user?.id || 1;
 
   const isAuthorizedForEmployees = ['CEO', 'HR', 'ADMIN', 'MD'].includes(userRole);
+  // Field / multi-site staff (set by the field attendance migration)
+  const isFieldUser = String(user?.attendance_mode || '').toUpperCase() === 'FIELD' && !isAuthorizedForEmployees;
 
   const getCompanyNameById = (id) => {
     switch (Number(id)) {
@@ -276,7 +280,7 @@ function MDDashboard({ user, onLogout }) {
     };
   }, [selectedCompanyName, getSelectedCompanyId]);
 
-  const sendAttendanceRequest = async (companyId, role, latitude, longitude) => {
+  const sendAttendanceRequest = async (companyId, role, latitude, longitude, accuracy = null) => {
     try {
       const token = localStorage.getItem('token');
       if (!token || token === "undefined" || token === "null") {
@@ -291,7 +295,7 @@ function MDDashboard({ user, onLogout }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ company_id: companyId, latitude, longitude, check_in: timeStr, site_name: 'Project Site' })
+        body: JSON.stringify({ company_id: companyId, latitude, longitude, accuracy, check_in: timeStr, site_name: 'Project Site' })
       });
 
       const data = await response.json();
@@ -319,7 +323,8 @@ function MDDashboard({ user, onLogout }) {
       return;
     }
 
-    if (['MD', 'CEO'].includes(userRole)) {
+    // Only the MD (and group-access leadership, who sign in as MD) skip the location check; CEOs check in at a site
+    if (userRole === 'MD') {
       await sendAttendanceRequest(userCompanyId, userRole, null, null);
       return;
     }
@@ -345,10 +350,10 @@ function MDDashboard({ user, onLogout }) {
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
-        await sendAttendanceRequest(userCompanyId, userRole, position.coords.latitude, position.coords.longitude);
+        await sendAttendanceRequest(userCompanyId, userRole, position.coords.latitude, position.coords.longitude, position.coords.accuracy);
       },
       () => { alert('GPS Error: Please enable location permission in your browser to check-in.'); },
-      { enableHighAccuracy: true }
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
     );
   };
 
@@ -567,6 +572,7 @@ function MDDashboard({ user, onLogout }) {
       case 'Dashboard':
         return (
           <div className="hr-dash">
+            {isFieldUser && <FieldTodayCard onOpen={() => handleMenuChange('Field Visits')} />}
             <DashboardTab
               userRole={userRole}
               stats={stats}
@@ -610,6 +616,18 @@ function MDDashboard({ user, onLogout }) {
             selectedEmployeeId={selectedEmployeeId}
             setSelectedEmployeeId={setSelectedEmployeeId}
             backButtonText={previousCompanyContext ? "Back to Group Overview" : "Back to Group Overview"}
+          />
+        );
+
+      case 'Field Visits':
+        return <FieldVisits user={user} />;
+
+      case 'Field Tracking':
+        return (
+          <FieldTracking
+            companyId={selectedCompanyName === 'All Companies' ? 'all' : getSelectedCompanyId()}
+            selectedCompany={selectedCompanyName}
+            userRole={userRole}
           />
         );
 
@@ -736,6 +754,7 @@ function MDDashboard({ user, onLogout }) {
         setActiveCompanyDashboard={setActiveCompanyDashboard}
         mobileOpen={navOpen}
         brand={sidebarBrand}
+        fieldUser={isFieldUser}
         onClose={() => setNavOpen(false)}
       />
 

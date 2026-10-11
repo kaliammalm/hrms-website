@@ -21,13 +21,13 @@ export function getRoleLabel(user) {
   return base.toUpperCase() === 'MD' ? 'MD' : base;
 }
 
-const STAFF_MENUS = ['Dashboard', 'My Attendance', 'Leave Requests', 'Payslips', 'Settings'];
+const STAFF_MENUS = ['Dashboard', 'Field Visits', 'My Attendance', 'Leave Requests', 'Payslips', 'Settings'];
 const MENU_ACCESS = {
   MD: '*',
   ADMIN: '*',
-  CEO: ['Dashboard', 'Employees', 'Attendance', 'My Attendance', 'Leave Requests', 'Payroll', 'Payslips',
+  CEO: ['Dashboard', 'Employees', 'Attendance', 'My Attendance', 'Field Tracking', 'Leave Requests', 'Payroll', 'Payslips',
     'Recruitment', 'Performance', 'Reports', 'Approvals', 'Settings'],
-  HR: ['Dashboard', 'Employees', 'Attendance', 'My Attendance', 'Leave Requests', 'Payroll', 'Payslips',
+  HR: ['Dashboard', 'Employees', 'Attendance', 'My Attendance', 'Field Tracking', 'Leave Requests', 'Payroll', 'Payslips',
     'Performance', 'Settings'],
 };
 

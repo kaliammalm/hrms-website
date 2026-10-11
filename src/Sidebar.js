@@ -1,7 +1,7 @@
 import React from 'react';
-import { LayoutDashboard, CalendarCheck, CalendarDays, FileSpreadsheet, Wallet, Settings as SettingsIcon, Users, Building2, BarChart3, UserPlus, CheckCircle } from 'lucide-react';
+import { LayoutDashboard, CalendarCheck, CalendarDays, FileSpreadsheet, Wallet, Settings as SettingsIcon, Users, Building2, BarChart3, UserPlus, CheckCircle, MapPinned, Route } from 'lucide-react';
 
-function Sidebar({ activeMenu, setActiveMenu, userRole, activeCompanyDashboard, mobileOpen = false, onClose, brand }) {
+function Sidebar({ activeMenu, setActiveMenu, userRole, activeCompanyDashboard, mobileOpen = false, onClose, brand, fieldUser = false }) {
   const getMenuItems = (role) => {
     if (role === 'MD' || role === 'ADMIN') {
       let items = [
@@ -9,6 +9,7 @@ function Sidebar({ activeMenu, setActiveMenu, userRole, activeCompanyDashboard, 
         { id: 'Employees', label: 'Employees Management', icon: Users },
         { id: 'Companies', label: 'All Companies', icon: Building2 },
         { id: 'Leave Approvals', label: 'Leave Approvals', icon: CalendarDays },
+        { id: 'Field Tracking', label: 'Field Tracking', icon: Route },
         { id: 'Performance', label: 'Performance', icon: BarChart3 },
         { id: 'Reports', label: 'Reports & Analytics', icon: FileSpreadsheet },
         { id: 'Payroll', label: 'Payroll & Slips', icon: Wallet },
@@ -26,6 +27,7 @@ function Sidebar({ activeMenu, setActiveMenu, userRole, activeCompanyDashboard, 
         { id: 'Dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { id: 'Employees', label: 'Employees Management', icon: Users },
         { id: 'Attendance', label: 'Attendance', icon: CalendarCheck },
+        { id: 'Field Tracking', label: 'Field Tracking', icon: Route },
         { id: 'Leave Requests', label: 'Leave Requests', icon: CalendarDays },
         { id: 'Payroll', label: 'Payroll & Slips', icon: Wallet },
         { id: 'Recruitment', label: 'Recruitment', icon: UserPlus },
@@ -38,6 +40,7 @@ function Sidebar({ activeMenu, setActiveMenu, userRole, activeCompanyDashboard, 
       return [
         { id: 'Dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { id: 'Employees', label: 'Employees', icon: Users },
+        { id: 'Field Tracking', label: 'Field Tracking', icon: Route },
         { id: 'Leave Requests', label: 'Leave Requests', icon: CalendarDays },
         { id: 'Performance', label: 'Performance', icon: BarChart3 },
         { id: 'Settings', label: 'Settings', icon: SettingsIcon },
@@ -45,6 +48,8 @@ function Sidebar({ activeMenu, setActiveMenu, userRole, activeCompanyDashboard, 
     } else {
       return [
         { id: 'Dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        // Field staff (users.attendance_mode = FIELD) get their site-visit screen
+        ...(fieldUser ? [{ id: 'Field Visits', label: 'Field Visits', icon: MapPinned }] : []),
         { id: 'My Attendance', label: 'My Attendance', icon: CalendarCheck },
         { id: 'Leave Requests', label: 'Leave Requests', icon: CalendarDays },
         { id: 'Payslips', label: 'Payslips', icon: Wallet },

@@ -6,7 +6,7 @@
      Settings           PF / ESI / PT rules, structure defaults, company and bank details
    Backend: /api/pay/* (backend/payroll/payrollRoutes.js)
    ========================================================================== */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Wallet, Plus, RefreshCw, CircleCheck, RotateCcw, Download, FileText, Landmark, Trash, TriangleAlert, ArrowLeft,
   Pencil, X, Settings as SettingsIcon, Users, CirclePause, Info,
@@ -22,7 +22,9 @@ const STATUS_LABEL = { DRAFT: 'Draft', APPROVED: 'Approved', PAID: 'Paid' };
 function useNotice() {
   const [notice, setNotice] = useState(null);
   useEffect(() => { if (!notice) return undefined; const t = setTimeout(() => setNotice(null), notice.tone === 'error' ? 9000 : 5000); return () => clearTimeout(t); }, [notice]);
-  return [notice, (tone, text) => setNotice({ tone, text })];
+  // Stable function: screens list `notify` in their load callbacks, so a new one each render would refetch forever
+  const notify = useCallback((tone, text) => setNotice({ tone, text }), []);
+  return [notice, notify];
 }
 function Notice({ notice }) {
   if (!notice) return null;
@@ -45,7 +47,7 @@ function RunsList({ companyId, onOpen, notify }) {
   const [period, setPeriod] = useState(shiftPeriod(currentPeriod(), 0));
   const [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
-    try { setData(await payFetch(`/pay/runs?companyId=${companyId}`)); } catch (e) { notify('error', e.message); setData({ runs: [] }); }
+    try { setData(await payFetch(`/pay/runs?companyId=${companyId}`)); } catch (e) { notify('error', e.message); setData({ runs: [], error: e.message }); }
   }, [companyId, notify]);
   useEffect(() => { setData(null); load(); }, [load]);
   const create = async () => {
@@ -76,7 +78,12 @@ function RunsList({ companyId, onOpen, notify }) {
         </div>
       )}
       <Panel title="Pay runs" icon={<Wallet size={16} />} flush actions={<button type="button" className="hr-btn hr-btn-ghost hr-btn-sm hr-btn-icon" onClick={load} aria-label="Refresh"><RefreshCw size={14} /></button>}>
-        {!data ? <div className="py-loading">Loading…</div> : !data.runs.length ? (
+        {!data ? <div className="py-loading">Loading…</div> : data.error ? (
+          <>
+            <EmptyState icon={<TriangleAlert size={20} />} title="Pay runs could not be loaded" text={data.error} />
+            <div className="py-retry"><button type="button" className="hr-btn hr-btn-secondary" onClick={load}><RefreshCw size={14} /> Try again</button></div>
+          </>
+        ) : !data.runs.length ? (
           <EmptyState icon={<Wallet size={20} />} title="No pay runs yet" text="Create the first pay run above. Add salary structures first so everyone is paid correctly." />
         ) : (
           <div className="hr-table-wrap">
@@ -116,7 +123,13 @@ function MoneyInput({ value, onCommit, disabled, label, max }) {
 
 function PayslipModal({ itemId, onClose, notify }) {
   const [p, setP] = useState(null);
-  useEffect(() => { payFetch(`/pay/payslips/${itemId}`).then((d) => setP(d.payslip)).catch((e) => { notify('error', e.message); onClose(); }); }, [itemId, notify, onClose]);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    let live = true;
+    payFetch(`/pay/payslips/${itemId}`).then((d) => { if (live) setP(d.payslip); }).catch((e) => { if (live) { notify('error', e.message); closeRef.current(); } });
+    return () => { live = false; };
+  }, [itemId, notify]);
   const download = async () => {
     try { const { buildPayslipsPdf, payslipFileName } = await import('./payslipPdf'); const doc = await buildPayslipsPdf([p]); await saveBlob(doc.output('blob'), payslipFileName(p)); } catch (e) { notify('error', e.message); }
   };
@@ -495,12 +508,28 @@ function SettingsView({ companyId, notify }) {
   const [canEdit, setCanEdit] = useState(false);
   const [slabs, setSlabs] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     setS(null);
+    setLoadError('');
     payFetch(`/pay/settings?companyId=${companyId}`).then((d) => { setS(d.settings); setCanEdit(d.canEdit); return payFetch(`/pay/pt-slabs?state=${d.settings.pt_state || 'TN'}`); })
-      .then((d) => d && setSlabs(d.slabs)).catch((e) => notify('error', e.message));
-  }, [companyId, notify]);
-  if (!s) return <Panel><div className="py-loading">Loading settings…</div></Panel>;
+      .then((d) => d && setSlabs(d.slabs)).catch((e) => { setLoadError(e.message); notify('error', e.message); });
+  }, [companyId, notify, attempt]);
+  if (!s) {
+    return (
+      <Panel>
+        {loadError
+          ? (
+            <>
+              <EmptyState icon={<TriangleAlert size={20} />} title="Settings could not be loaded" text={loadError} />
+              <div className="py-retry"><button type="button" className="hr-btn hr-btn-secondary" onClick={() => setAttempt((n) => n + 1)}><RefreshCw size={14} /> Try again</button></div>
+            </>
+          )
+          : <div className="py-loading">Loading settings…</div>}
+      </Panel>
+    );
+  }
   const set = (k) => (e) => setS((x) => ({ ...x, [k]: e.target.type === 'checkbox' ? (e.target.checked ? 1 : 0) : e.target.value }));
   const save = async () => {
     setSaving(true);

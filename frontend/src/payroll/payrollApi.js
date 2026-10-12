@@ -6,7 +6,17 @@ import { API_BASE } from '../config';
 import { fieldFetch } from '../field/fieldApi';
 
 /** JSON request with readable errors (same behaviour as the field screens) */
-export const payFetch = (path, opts) => fieldFetch(path, opts);
+export const payFetch = async (path, opts) => {
+  try {
+    return await fieldFetch(path, opts);
+  } catch (e) {
+    // 404 on a /pay route = the server running is an older backend without the payroll module
+    if (e && e.status === 404 && !e.body?.error) {
+      e.message = 'Payroll is not installed on the server yet. Deploy the latest backend (with the payroll folder) and run scripts/add-payroll.js.';
+    }
+    throw e;
+  }
+};
 
 export const inr = (n, { decimals = 0, symbol = true } = {}) => {
   const v = Number(n) || 0;

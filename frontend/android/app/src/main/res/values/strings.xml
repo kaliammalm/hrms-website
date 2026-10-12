@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">RRD Group HRMS</string>
+    <string name="title_activity_main">RRD Group HRMS</string>
+    <string name="package_name">com.rrdgroup.hrms</string>
+    <string name="custom_url_scheme">com.rrdgroup.hrms</string>
+</resources>

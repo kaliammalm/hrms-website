@@ -1,0 +1,196 @@
+{
+  "_source": "Attendance System Setup Data (PDF, prepared 25 Sep 2026). Basker (RRD-009) intentionally excluded. Vasumathi listed as 'Accounts' in the PDF; set to CFO with group (all-company) access per instruction.",
+  "_format": "company: RRD or Fractio. email 'Pending' = no login email yet (existing email kept, else placeholder <code>@pending.local). Blank/Pending fields never overwrite existing data. access_role optional (HR/ADMIN) — CEOs are detected by name.",
+  "employees": [
+    {
+      "emp_code": "FTO-001",
+      "name": "Vinu Karthick I",
+      "email": "vinu@fractio.co.in",
+      "designation": "CEO",
+      "department": "",
+      "company": "Fractio",
+      "phone": "+91 73977 07770",
+      "joining_date": "01/05/2026"
+    },
+    {
+      "emp_code": "FTO-002",
+      "name": "Ganesh Kumar",
+      "email": "ganesh@storiesbyvarnam.com",
+      "designation": "Chief Technical Head",
+      "department": "",
+      "company": "Fractio",
+      "phone": "+91 96559 99952",
+      "joining_date": "06/06/2026"
+    },
+    {
+      "emp_code": "FTO-003",
+      "name": "Jabasingh J",
+      "email": "jeba@storiesbyvarnam.com",
+      "designation": "Software Engineer",
+      "department": "",
+      "company": "Fractio",
+      "phone": "+91 97901 15273",
+      "joining_date": "17/08/2026"
+    },
+    {
+      "emp_code": "FTO-004",
+      "name": "Gowtham Sethupathi A",
+      "email": "gowtham@storiesbyvarnam.com",
+      "designation": "Performance Marketing Executive",
+      "department": "",
+      "company": "Fractio",
+      "phone": "+91 63803 69049",
+      "joining_date": "10/08/2026"
+    },
+    {
+      "emp_code": "FTO-005",
+      "name": "Divya",
+      "email": "divya@fractio.co.in",
+      "designation": "Telecaller",
+      "department": "",
+      "company": "Fractio",
+      "phone": "+91 95149 35547",
+      "joining_date": "07/06/2026"
+    },
+    {
+      "emp_code": "FTO-006",
+      "name": "Kaliammal M",
+      "email": "kaliyammal@fractio.co.in",
+      "designation": "Software Engineer",
+      "department": "",
+      "company": "Fractio",
+      "phone": "+91 80156 25544",
+      "joining_date": "03/09/2026"
+    },
+    {
+      "emp_code": "FTO-007",
+      "name": "R Praveen Thomso",
+      "email": "praveen@fractio.co.in",
+      "designation": "Operations Manager",
+      "department": "",
+      "company": "Fractio",
+      "phone": "+91 73582 31207",
+      "joining_date": "01/07/2026"
+    },
+    {
+      "emp_code": "FTO-008",
+      "name": "Geetha S",
+      "email": "geetha@fractio.co.in",
+      "designation": "Reservations",
+      "department": "",
+      "company": "Fractio",
+      "phone": "+91 93637 88547",
+      "joining_date": "01/06/2026"
+    },
+    {
+      "emp_code": "FTO-009",
+      "name": "S Eshwar",
+      "email": "eshwar@fractio.co.in",
+      "designation": "Business Developer",
+      "department": "",
+      "company": "Fractio",
+      "phone": "+91 97406 41535",
+      "joining_date": "01/09/2026"
+    },
+    {
+      "emp_code": "RRD-001",
+      "name": "S Saravanan",
+      "email": "saravanan@ramreddydevelopers.com",
+      "designation": "Sales",
+      "department": "",
+      "company": "RRD",
+      "phone": "+91 98403 33640",
+      "joining_date": "01/09/2025"
+    },
+    {
+      "emp_code": "RRD-002",
+      "name": "Manikandan",
+      "email": "manikandan@ramreddydevelopers.com",
+      "designation": "Sales",
+      "department": "",
+      "company": "RRD",
+      "phone": "+91 84389 85069",
+      "joining_date": "01/06/2026"
+    },
+    {
+      "emp_code": "RRD-003",
+      "name": "Nisha",
+      "email": "nisha@ramreddydevelopers.com",
+      "designation": "Telecaller",
+      "department": "",
+      "company": "RRD",
+      "phone": "+91 72009 83869",
+      "joining_date": "01/03/2023"
+    },
+    {
+      "emp_code": "RRD-004",
+      "name": "Yogeshwari",
+      "email": "yogeshwari@ramreddydevelopers.com",
+      "designation": "Telecaller",
+      "department": "",
+      "company": "RRD",
+      "phone": "+91 80987 96269",
+      "joining_date": "11/09/2026"
+    },
+    {
+      "emp_code": "RRD-005",
+      "name": "Mohammed Hazee",
+      "email": "Pending",
+      "designation": "Personal Secretary",
+      "department": "",
+      "company": "RRD",
+      "phone": "+91 95662 91786",
+      "joining_date": "01/07/2026"
+    },
+    {
+      "emp_code": "RRD-006",
+      "name": "Venkatachalam",
+      "email": "Pending",
+      "designation": "Site Supervisor",
+      "department": "",
+      "company": "RRD",
+      "phone": "+91 93455 92630",
+      "joining_date": "12/03/2026"
+    },
+    {
+      "emp_code": "RRD-007",
+      "name": "Suman Kumar",
+      "email": "suman@ramreddydevelopers.com",
+      "designation": "Sales",
+      "department": "",
+      "company": "RRD",
+      "phone": "+91 63740 98012",
+      "joining_date": "12/03/2026"
+    },
+    {
+      "emp_code": "RRD-008",
+      "name": "Sabapathi (Harish)",
+      "email": "Pending",
+      "designation": "Site Supervisor",
+      "department": "",
+      "company": "RRD",
+      "phone": "+91 72007 80591",
+      "joining_date": "15/04/2026"
+    },
+    {
+      "emp_code": "RRD-011",
+      "name": "Nagamma",
+      "email": "Pending",
+      "designation": "Support Staff",
+      "department": "",
+      "company": "RRD",
+      "phone": "Pending",
+      "joining_date": "01/03/2023"
+    },
+    {
+      "emp_code": "RRD-012",
+      "name": "Vasumathi",
+      "email": "accounts@ramreddydevelopers.com",
+      "designation": "CFO",
+      "department": "",
+      "company": "RRD",
+      "phone": "+91 73959 83868",
+      "joining_date": "Pending"
+    }
+  ]
+}

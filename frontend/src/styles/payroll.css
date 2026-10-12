@@ -1,0 +1,146 @@
+/* ==========================================================================
+   Payroll screens (pay runs, salary structures, settings, my payslips)
+   ========================================================================== */
+.py-page { display: flex; flex-direction: column; gap: 16px; }
+.py-page .hr-panel + .hr-panel { margin-top: 0; }
+.py-page .hr-kpis { margin: 0; }
+.py-loading { padding: 32px; text-align: center; color: var(--muted); font-size: var(--fs-sm); }
+.py-label { font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--subtle); margin-bottom: 6px; }
+.py-hint { display: flex; gap: 6px; align-items: flex-start; font-size: 12.5px; color: var(--muted); margin: 10px 0 0; line-height: 1.45; }
+.py-hint svg { flex-shrink: 0; margin-top: 2px; }
+.py-company { min-width: 220px; }
+.py-search { width: 200px; height: 32px; }
+
+.py-notice { display: flex; align-items: flex-start; gap: 9px; padding: 11px 14px; border-radius: 10px; font-size: 14px; line-height: 1.4; border: 1px solid transparent; }
+.py-notice svg { flex-shrink: 0; margin-top: 1px; }
+.py-notice.is-success { background: var(--success-bg); color: var(--success); border-color: #bfe3d1; }
+.py-notice.is-error { background: var(--danger-bg); color: var(--danger); border-color: #f3cbc4; }
+.py-notice.is-info { background: var(--warning-bg); color: var(--warning); border-color: #f2ddb3; }
+
+.py-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.py-tabs button { border: 0; background: none; padding: 10px 14px; font: inherit; font-size: 14px; font-weight: 500; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.py-tabs button.is-on { color: var(--ink); font-weight: 600; border-bottom-color: var(--primary); }
+.py-tabs button:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+
+.py-newrun { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 16px 20px; border-radius: var(--r-panel); background: linear-gradient(135deg, #13213b, #24407d); color: #fff; }
+.py-newrun-title { font-size: 16px; font-weight: 600; }
+.py-newrun-sub { font-size: 13px; color: rgba(255, 255, 255, .72); margin-top: 2px; max-width: 60ch; }
+.py-newrun-form { display: flex; gap: 8px; }
+.py-newrun-form .hr-select { min-width: 170px; background-color: #fff; }
+.py-row-link { cursor: pointer; }
+
+/* Run detail */
+.py-run { display: flex; flex-direction: column; gap: 14px; }
+.py-run-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.py-run-title { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 600; color: var(--ink); margin: 0; }
+.py-run-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.py-steps { list-style: none; display: flex; gap: 6px; margin: 0; padding: 0; }
+.py-steps li { display: flex; align-items: center; gap: 6px; padding: 5px 12px 5px 6px; border-radius: 999px; background: var(--neutral-bg); color: var(--muted); font-size: 12.5px; font-weight: 500; }
+.py-steps li span { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: #fff; font-size: 11px; font-weight: 700; }
+.py-steps li.is-done { background: var(--success-bg); color: var(--success); }
+.py-steps li.is-now { background: var(--primary-50); color: var(--primary); font-weight: 600; }
+.py-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.py-danger { color: var(--danger) !important; }
+.py-paid-note { display: flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--success); font-weight: 500; }
+.py-inline-form { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; padding: 14px; border: 1px solid var(--line); border-radius: var(--r-panel); background: var(--surface); }
+.py-inline-form .hr-field { min-width: 200px; }
+.py-warnbar { display: flex; gap: 6px; align-items: center; padding: 8px 20px; background: var(--warning-bg); color: var(--warning); font-size: 12.5px; border-bottom: 1px solid var(--line); }
+
+.py-grid td { padding-top: 9px; padding-bottom: 9px; }
+.py-grid tr.is-held td { background: #fafbfd; color: var(--subtle); }
+.py-grid tr.is-saving td { opacity: .55; }
+.py-emp { display: flex; flex-direction: column; gap: 1px; min-width: 170px; position: relative; }
+.py-emp-name { border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: var(--ink); text-align: left; cursor: pointer; }
+.py-emp-name:not(:disabled):hover { color: var(--primary); text-decoration: underline; }
+.py-emp-name:disabled { cursor: default; }
+.py-emp-name.is-text { cursor: default; }
+.py-emp-sub { font-size: 11.5px; color: var(--muted); }
+.py-warn { position: absolute; right: -2px; top: 1px; color: var(--warning); cursor: help; }
+.py-held-tag { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--muted); }
+.py-cell-input { width: 76px; height: 30px; padding: 0 8px; border: 1px solid var(--line-strong); border-radius: 6px; font: inherit; font-size: 13px; text-align: right; background: #fff; color: var(--ink); }
+.py-cell-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(43, 80, 200, .14); }
+.py-check { width: 16px; height: 16px; accent-color: var(--primary); }
+
+.py-bank { display: flex; flex-direction: column; gap: 10px; }
+.py-bank-dl { display: flex; gap: 8px; flex-wrap: wrap; }
+.py-excluded { border: 1px solid #f2ddb3; background: var(--warning-bg); border-radius: 9px; padding: 10px 14px; font-size: 13px; color: var(--text-2); }
+.py-excluded-title { display: flex; gap: 6px; align-items: center; font-weight: 600; color: var(--warning); margin-bottom: 6px; }
+.py-excluded ul { margin: 0; padding-left: 18px; }
+
+/* Payslip view */
+.py-modal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 18px 22px 12px; border-bottom: 1px solid var(--line); }
+.py-slip-modal { max-width: 640px; }
+.py-slip { padding: 18px 22px; display: flex; flex-direction: column; gap: 16px; }
+.py-slip-net { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 10px; background: var(--surface-2); border-left: 3px solid var(--primary); }
+.py-slip-amount { font-size: 24px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.py-slip-words { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.py-slip-days { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; color: var(--muted); text-align: right; }
+.py-slip-days strong { color: var(--ink); }
+.py-slip-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.py-slip-head { display: flex; justify-content: space-between; font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--subtle); padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.py-slip-line { display: flex; justify-content: space-between; gap: 10px; font-size: 13.5px; color: var(--text-2); padding: 6px 0; font-variant-numeric: tabular-nums; }
+.py-slip-line.is-total { border-top: 1px solid var(--line); font-weight: 600; color: var(--ink); margin-top: 2px; }
+.py-slip-line.is-net { color: var(--success); }
+.py-slip-line.is-muted { color: var(--subtle); }
+.py-slip-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); }
+
+/* Structure editor */
+.py-editor { max-width: 900px; width: 100%; max-height: calc(100dvh - 40px); display: flex; flex-direction: column; }
+.py-editor-body { overflow-y: auto; padding: 18px 22px; display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px 24px; }
+.py-editor-body > section { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.py-editor-body > .py-stat, .py-editor-body > .hr-alert { grid-column: 1 / -1; }
+.py-seg { display: inline-grid; grid-auto-flow: column; gap: 4px; padding: 4px; border-radius: 10px; background: var(--neutral-bg); align-self: flex-start; }
+.py-seg button { height: 34px; padding: 0 14px; border: 0; border-radius: 7px; background: transparent; color: var(--text-2); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+.py-seg button.is-on { background: #fff; color: var(--ink); font-weight: 600; box-shadow: var(--shadow-1); }
+.py-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.py-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.py-toggle { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text-2); cursor: pointer; }
+.py-toggle input { width: 16px; height: 16px; accent-color: var(--primary); }
+.py-preview { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; gap: 0 !important; align-self: start; }
+.py-preview-empty { font-size: 13px; color: var(--muted); padding: 8px 0; }
+.py-preview-er { font-size: 12px; color: var(--muted); margin-top: 8px; }
+.py-warn-line { display: flex; gap: 6px; align-items: flex-start; margin-top: 8px; font-size: 12.5px; color: var(--danger); }
+
+.py-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.py-tag { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: var(--warning-bg); color: var(--warning); text-transform: uppercase; letter-spacing: .02em; }
+.py-tag.is-bad { background: var(--danger-bg); color: var(--danger); }
+.py-ok { font-size: 12.5px; color: var(--success); font-weight: 600; }
+
+.py-settings { display: flex; flex-direction: column; gap: 16px; }
+.py-settings .hr-panel-body { display: flex; flex-direction: column; gap: 12px; }
+.py-mini { max-width: 420px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.py-mini td, .py-mini th { padding: 7px 12px !important; }
+.py-save { display: flex; justify-content: flex-end; position: sticky; bottom: 0; padding: 12px 0; background: linear-gradient(transparent, var(--canvas) 40%); }
+
+/* My payslips */
+.py-latest { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding: 18px 20px; border-radius: 14px; background: linear-gradient(150deg, #13213b, #1d3263); color: #fff; }
+.py-latest .py-label { color: rgba(255, 255, 255, .6); }
+.py-latest-net { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.py-latest-sub { font-size: 13px; color: rgba(255, 255, 255, .72); }
+.py-latest-actions { display: flex; gap: 8px; }
+.py-latest .hr-btn-secondary { background: rgba(255, 255, 255, .12); color: #fff; border-color: rgba(255, 255, 255, .25); }
+.py-mylist { list-style: none; margin: 0; padding: 0; }
+.py-mylist li { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 14px; padding: 12px 20px; }
+.py-mylist li + li { border-top: 1px solid var(--line); }
+.py-mylist-main { display: flex; flex-direction: column; gap: 3px; }
+.py-mylist-main strong { color: var(--ink); font-size: 14px; }
+.py-mylist-main span { font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.py-mylist-net { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.py-mylist-actions { display: flex; gap: 6px; }
+
+@media (max-width: 900px) {
+  .py-editor-body { grid-template-columns: 1fr; }
+  .py-grid3 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 560px) {
+  .py-grid2, .py-grid3, .py-slip-cols { grid-template-columns: 1fr; }
+  .py-newrun-form { width: 100%; }
+  .py-newrun-form .hr-select { flex: 1; min-width: 0; }
+  .py-search { width: 100%; }
+  .py-steps li { padding-right: 8px; font-size: 11.5px; }
+  .py-mylist li { grid-template-columns: 1fr auto; padding: 12px 16px; }
+  .py-mylist-actions { grid-column: 1 / -1; }
+  .py-editor { max-height: 100dvh; border-radius: 0; }
+  .py-latest-actions { width: 100%; }
+  .py-latest-actions .hr-btn { flex: 1; }
+}

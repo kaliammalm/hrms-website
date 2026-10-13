@@ -76,38 +76,6 @@ module.exports = function(db, authenticate, getLocalDateTime, calculateDistance,
     });
   });
 
-  // ---------- POST: Add New Employee API ----------
-  router.post('/employees', authenticate, (req, res) => {
-    const { name, email, role, department, company_id, attendance_type, biometric_id, emp_code, dob, date_of_birth, joining_date, date_of_joining, monthly_salary, hra, allowances, deductions } = req.body;
-    if (!name || !email || !company_id) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    const birthDate = dob || date_of_birth || null;
-    const joiningDate = joining_date || date_of_joining || null;
-
-    db.query('SELECT name FROM companies WHERE id = ?', [company_id], (compErr, compResults) => {
-      const companyName = compResults?.[0]?.name || 'Ram Reddy Developers';
-      const defaultPassword = req.body.password || 'password123';
-      
-      const query = `
-        INSERT INTO users (name, email, password, role, department, company_id, company_name, attendance_type, biometric_id, emp_code, dob, joining_date, monthly_salary, hra, allowances, deductions) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `;
-      db.query(query, [
-        name, email, defaultPassword, role || 'EMPLOYEE', department || 'General', company_id, companyName, 
-        attendance_type || 'OFFICE', biometric_id || null, emp_code || null, birthDate, joiningDate,
-        monthly_salary || 0, hra || 0, allowances || 0, deductions || 0
-      ], (err, result) => {
-        if (err) {
-          if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Email already exists.' });
-          return res.status(500).json({ error: 'Database error while adding employee' });
-        }
-        res.status(201).json({ message: 'Employee added successfully!', id: result.insertId });
-      });
-    });
-  });
-
   // =====================================================================
   // Employee records: permissions + profile/compensation editing
   // =====================================================================
@@ -173,6 +141,7 @@ module.exports = function(db, authenticate, getLocalDateTime, calculateDistance,
   const staffOnly = (a = '') => `UPPER(COALESCE(${a}role, '')) <> 'MD'`
     + (hasGroupAccessColumn ? ` AND COALESCE(${a}group_access, 0) = 0` : '');
 
+  const EMPLOYMENT_TYPES = ['Full-time', 'Probation', 'Contract', 'Part-time', 'Intern', 'Consultant'];
   // Request field -> DB column. Optional columns are skipped when the table doesn't have them.
   const EDITABLE_FIELDS = [
     { col: 'name', keys: ['name'], type: 'text', required: true },
@@ -201,28 +170,41 @@ module.exports = function(db, authenticate, getLocalDateTime, calculateDistance,
     { col: 'emergency_contact_name', keys: ['emergency_contact_name', 'emergencyContactName'], type: 'text' },
     { col: 'emergency_contact_phone', keys: ['emergency_contact_phone', 'emergencyContactPhone'], type: 'text' },
     { col: 'reporting_manager', keys: ['reporting_manager', 'reportingManager'], type: 'text' },
+    // Added by scripts/add-profile-columns.js (employee management v2) and scripts/add-payroll.js
+    { col: 'reporting_manager_id', keys: ['reporting_manager_id', 'reportingManagerId'], type: 'id' },
+    { col: 'employment_type', keys: ['employment_type', 'employmentType'], type: 'enum', values: EMPLOYMENT_TYPES },
+    { col: 'attendance_mode', keys: ['attendance_mode', 'attendanceMode'], type: 'enum', values: ['OFFICE', 'FIELD'] },
+    { col: 'exit_date', keys: ['exit_date', 'exitDate'], type: 'date' },
+    { col: 'uan', keys: ['uan'], type: 'uan' },
+    { col: 'pf_number', keys: ['pf_number', 'pfNumber'], type: 'upper' },
+    { col: 'account_holder_name', keys: ['account_holder_name', 'accountHolderName'], type: 'text' },
+    { col: 'bank_branch', keys: ['bank_branch', 'bankBranch'], type: 'text' },
   ];
-  const OPTIONAL_PROFILE_COLUMNS = ['aadhar_number', 'esi_number', 'gender', 'blood_group', 'emergency_contact_name', 'emergency_contact_phone', 'reporting_manager'];
+  const OPTIONAL_PROFILE_COLUMNS = ['aadhar_number', 'esi_number', 'gender', 'blood_group', 'emergency_contact_name', 'emergency_contact_phone', 'reporting_manager',
+    'reporting_manager_id', 'employment_type', 'attendance_mode', 'exit_date', 'uan', 'pf_number', 'account_holder_name', 'bank_branch'];
 
   // Builds "SET col = ?" pairs from the request body. Only fields present in the body change.
   // Returns { sets, params, errors }.
-  const FIELD_LABELS = { monthly_salary: 'Basic salary', hra: 'HRA', joining_date: 'Joining date', dob: 'Date of birth', name: 'Name', role: 'Designation' };
+  const FIELD_LABELS = { monthly_salary: 'Basic salary', hra: 'HRA', joining_date: 'Joining date', dob: 'Date of birth', name: 'Name', role: 'Designation',
+    uan: 'UAN', pf_number: 'PF number', esi_number: 'ESI number', pan_number: 'PAN', ifsc_code: 'IFSC code', account_number: 'Account number',
+    reporting_manager_id: 'Reporting manager', employment_type: 'Employment type', attendance_mode: 'Attendance mode', exit_date: 'Exit date' };
   const fieldLabel = (col) => FIELD_LABELS[col] || col.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
 
   const buildEmployeeUpdate = (body, columns, allowedCols) => {
-    const sets = []; const params = []; const errors = [];
+    const sets = []; const params = []; const errors = []; const skipped = [];
     for (const f of EDITABLE_FIELDS) {
       if (allowedCols && !allowedCols.includes(f.col)) continue;
-      if (!columns.has(f.col)) continue;
       const key = f.keys.find(k => Object.prototype.hasOwnProperty.call(body, k));
       if (!key) continue;
+      // Sent but the column doesn't exist yet: report it instead of silently dropping it
+      if (!columns.has(f.col)) { if (body[key] !== '' && body[key] !== null && body[key] !== undefined) skipped.push(fieldLabel(f.col)); continue; }
       let v = body[key];
       if (v === undefined) continue;
       if (typeof v === 'string') v = v.trim();
       const empty = v === null || v === '';
       if (f.required && empty) { errors.push(`${fieldLabel(f.col)} is required`); continue; }
       if (empty) {
-        v = f.type === 'money' ? 0 : (columns.get(f.col).nullable ? null : '');
+        v = f.type === 'money' ? 0 : (f.type === 'id' || columns.get(f.col).nullable ? null : '');
       } else if (f.type === 'money') {
         const n = Number(String(v).replace(/[₹,\s]/g, ''));
         if (!Number.isFinite(n) || n < 0) { errors.push(`${fieldLabel(f.col)} must be a positive number`); continue; }
@@ -240,14 +222,34 @@ module.exports = function(db, authenticate, getLocalDateTime, calculateDistance,
       } else if (f.type === 'pan') {
         v = String(v).toUpperCase();
         if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(v)) { errors.push('PAN must look like ABCDE1234F'); continue; }
+      } else if (f.type === 'uan') {
+        v = String(v).replace(/\s+/g, '');
+        if (!/^\d{12}$/.test(v)) { errors.push('UAN must be 12 digits'); continue; }
+      } else if (f.type === 'upper') {
+        v = String(v).toUpperCase();
+      } else if (f.type === 'id') {
+        const n = Number(v);
+        if (!Number.isInteger(n) || n <= 0) { errors.push(`${fieldLabel(f.col)} is not valid`); continue; }
+        v = n;
+      } else if (f.type === 'enum') {
+        const hit = f.values.find((x) => x.toLowerCase() === String(v).toLowerCase());
+        if (!hit) { errors.push(`${fieldLabel(f.col)} must be one of: ${f.values.join(', ')}`); continue; }
+        v = hit;
+      } else if (f.col === 'account_number') {
+        v = String(v).replace(/\s+/g, '');
+        if (!/^\d{9,18}$/.test(v)) { errors.push('Account number must be 9 to 18 digits'); continue; }
+      } else if (f.col === 'phone' || f.col === 'emergency_contact_phone') {
+        const d = String(v).replace(/\D/g, '').replace(/^(91|0)(?=\d{10}$)/, '');
+        if (!/^[6-9]\d{9}$/.test(d)) { errors.push(`${fieldLabel(f.col)} must be a 10-digit mobile number`); continue; }
       }
       sets.push(`${f.col} = ?`); params.push(v);
     }
-    return { sets, params, errors };
+    return { sets, params, errors, skipped };
   };
 
   const selectEmployeeSql = (columns, where) => {
     const optional = OPTIONAL_PROFILE_COLUMNS.filter(c => columns.has(c)).map(c => `u.${c}`);
+    if (columns.has('reporting_manager_id')) optional.push('(SELECT m.name FROM users m WHERE m.id = u.reporting_manager_id) as reporting_manager_name');
     return `
       SELECT u.id, u.emp_code, u.name, u.email, u.role, u.department,
              u.company_id, COALESCE(c.name, u.company_name, 'Unassigned') as company_name,
@@ -271,12 +273,27 @@ module.exports = function(db, authenticate, getLocalDateTime, calculateDistance,
     bloodGroup: row.blood_group,
     emergencyContactName: row.emergency_contact_name,
     emergencyContactPhone: row.emergency_contact_phone,
-    reportingManager: row.reporting_manager,
+    reportingManager: row.reporting_manager_name || row.reporting_manager || '',
+    reportingManagerId: row.reporting_manager_id || null,
     status: row.payslip_status || 'Pending',
-    employmentType: 'Full-Time / Permanent',
+    employmentType: row.employment_type || '',
+    employmentStatus: employmentStatus(row.exit_date),
+    attendanceMode: row.attendance_mode || 'OFFICE',
+    uan: row.uan || '',
+    pfNumber: row.pf_number || '',
+    exitDate: row.exit_date || '',
+    bankBranch: row.bank_branch || '',
+    accountHolderName: row.account_holder_name || '',
     joiningDate: row.joining_date || '',
     workLocation: 'Office'
   });
+  const todayIST = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  // Active / Exiting (exit date ahead) / Exited (exit date reached)
+  const employmentStatus = (exitDate) => {
+    const d = String(exitDate || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return 'Active';
+    return d <= todayIST() ? 'Exited' : 'Exiting';
+  };
 
   // Loads the target employee and checks the requester may act on it.
   // mode: 'edit' (MD/CEO), 'view' (management or self), 'self-or-edit'
@@ -294,6 +311,175 @@ module.exports = function(db, authenticate, getLocalDateTime, calculateDistance,
     });
   };
 
+  // ---------- Employee management v2: reporting managers, employee IDs, add employee ----------
+  const dbq = (sql, params = []) => new Promise((resolve, reject) => db.query(sql, params, (err, rows) => (err ? reject(err) : resolve(rows))));
+  const isLeaderRow = (u) => String(u.role || '').toUpperCase() === 'MD' || Number(u.group_access || 0) === 1;
+
+  // A reporting manager must exist, must not be the employee, and must work in the same company
+  // or be group leadership (the MD account / group-access users).
+  // Returns { id, name } or throws an Error with a user-facing message.
+  const resolveManager = async (managerId, companyId, selfId) => {
+    if (managerId === null || managerId === undefined || managerId === '') return null;
+    const id = Number(managerId);
+    const cols = hasGroupAccessColumn ? ', group_access' : '';
+    const rows = await dbq(`SELECT id, name, role, company_id${cols} FROM users WHERE id = ?`, [id]);
+    const m = rows && rows[0];
+    if (!m) throw new Error('The selected reporting manager no longer exists.');
+    if (selfId && Number(selfId) === id) throw new Error('An employee cannot report to themselves.');
+    if (!isLeaderRow(m) && Number(m.company_id) !== Number(companyId)) throw new Error('The reporting manager must be in the same company, or be the group MD.');
+    return { id: m.id, name: m.name };
+  };
+
+  // Company prefix for employee IDs: the prefix most used in that company (RRD-012 → RRD),
+  // otherwise the company's initials (Stories by Varnam → SBV).
+  const STOP_WORDS = new Set(['&', 'pvt', 'pvt.', 'private', 'ltd', 'ltd.', 'limited', 'llp', 'inc', 'co', 'co.']);
+  const CODE_RE = /^([A-Za-z]+)([-_/]?)(\d+)$/;
+  const nextEmpCode = async (companyId) => {
+    const all = await dbq("SELECT emp_code, company_id FROM users WHERE emp_code IS NOT NULL AND emp_code <> ''");
+    const mine = all.filter((r) => Number(r.company_id) === Number(companyId)).map((r) => String(r.emp_code).match(CODE_RE)).filter(Boolean);
+    let prefix; let sep = '-'; let width = 3;
+    if (mine.length) {
+      const count = {};
+      mine.forEach((m) => { const k = m[1].toUpperCase(); count[k] = (count[k] || 0) + 1; });
+      prefix = Object.keys(count).sort((a, b) => count[b] - count[a])[0];
+      const same = mine.filter((m) => m[1].toUpperCase() === prefix);
+      sep = same[0][2];
+      width = Math.max(...same.map((m) => m[3].length));
+    } else {
+      const rows = await dbq('SELECT name FROM companies WHERE id = ?', [companyId]);
+      const words = String(rows[0]?.name || 'EMP').split(/\s+/).filter((w) => w && !STOP_WORDS.has(w.toLowerCase()));
+      prefix = words.map((w) => w[0]).join('').toUpperCase().replace(/[^A-Z]/g, '') || 'EMP';
+      if (prefix.length < 2) prefix = String(rows[0]?.name || 'EMP').replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() || 'EMP';
+    }
+    // Highest number for this prefix anywhere in the group, so IDs never collide
+    const used = all.map((r) => String(r.emp_code).match(CODE_RE)).filter((m) => m && m[1].toUpperCase() === prefix).map((m) => Number(m[3]));
+    const next = (used.length ? Math.max(...used) : 0) + 1;
+    return `${prefix}${sep}${String(next).padStart(width, '0')}`;
+  };
+  const tempPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    const bytes = require('crypto').randomBytes(10);
+    return Array.from(bytes, (b) => chars[b % chars.length]).join('');
+  };
+
+  // ---------- GET: lookups for the Add / Edit employee forms ----------
+  // ?companyId= → { nextCode, managers, departments, designations, employmentTypes, canAdd }
+  router.get('/employees/meta', authenticate, async (req, res) => {
+    try {
+      const scope = managementScope(req);
+      if (!scope) return res.status(403).json({ error: 'You do not have permission to manage employees.' });
+      const edit = editScope(req);
+      let companyId = Number(req.query.companyId || 0) || null;
+      if (scope !== 'all') companyId = Number(scope);
+      const columns = await new Promise((resolve) => getUserColumns(resolve));
+      const ga = hasGroupAccessColumn ? ', u.group_access' : '';
+      const active = columns.has('exit_date') ? ' AND (u.exit_date IS NULL OR u.exit_date > ?)' : '';
+      const params = [];
+      let where = '1=1';
+      if (companyId) { where = `(u.company_id = ? OR UPPER(COALESCE(u.role, '')) = 'MD'${hasGroupAccessColumn ? ' OR COALESCE(u.group_access, 0) = 1' : ''})`; params.push(companyId); }
+      if (active) params.push(todayIST());
+      const people = await dbq(`SELECT u.id, u.name, u.role, u.emp_code, u.company_id, COALESCE(c.name, u.company_name, '') as company_name${ga}
+        FROM users u LEFT JOIN companies c ON c.id = u.company_id WHERE ${where}${active} ORDER BY u.name`, params);
+      const managers = people.map((u) => ({ id: u.id, name: u.name, role: u.role || '', empCode: u.emp_code || '', companyId: u.company_id, companyName: u.company_name, isGroupLeader: isLeaderRow(u) }))
+        .sort((a, b) => (Number(b.isGroupLeader) - Number(a.isGroupLeader)) || a.name.localeCompare(b.name));
+      const scopeWhere = scope === 'all' ? '' : ' AND company_id = ?';
+      const scopeParams = scope === 'all' ? [] : [scope];
+      const distinct = async (col) => (await dbq(`SELECT DISTINCT ${col} as v FROM users WHERE ${col} IS NOT NULL AND ${col} <> ''${scopeWhere} ORDER BY ${col}`, scopeParams))
+        .map((r) => String(r.v).trim()).filter((v) => v && v.toUpperCase() !== 'EMPLOYEE' && v.toLowerCase() !== 'general');
+      res.json({
+        companyId,
+        canAdd: Boolean(edit),
+        nextCode: edit && companyId ? await nextEmpCode(companyId) : null,
+        managers,
+        departments: await distinct('department'),
+        designations: await distinct('role'),
+        employmentTypes: EMPLOYMENT_TYPES,
+        missingColumns: ['employment_type', 'reporting_manager_id', 'uan', 'pf_number', 'exit_date', 'attendance_mode'].filter((c) => !columns.has(c)),
+      });
+    } catch (e) {
+      console.error('Employee meta error:', e);
+      res.status(500).json({ error: 'Could not load the employee form data.' });
+    }
+  });
+
+  // ---------- POST: Add employee — MD / Admin (any company), company CEO (own company) ----------
+  // Body: first_name, last_name (or name), email, phone, company_id, emp_code (blank = automatic),
+  //       role (designation), department, employment_type, joining_date, reporting_manager_id, attendance_mode,
+  //       pan_number, uan, pf_number, esi_number, bank_name, account_number, ifsc_code, ... (any EDITABLE_FIELDS key)
+  // Reply 201: { employee, emp_code, temporaryPassword, notSaved }
+  router.post('/employees', authenticate, async (req, res) => {
+    try {
+      const scope = editScope(req);
+      if (!scope) return res.status(403).json({ error: 'Only the MD or a company CEO can add employees.' });
+      const body = { ...req.body };
+      const first = String(body.first_name || body.firstName || '').trim();
+      const last = String(body.last_name || body.lastName || '').trim();
+      if (!body.name && (first || last)) body.name = `${first} ${last}`.trim();
+      if (!String(body.name || '').trim()) return res.status(400).json({ error: 'First name is required.' });
+      if (!String(body.email || '').trim()) return res.status(400).json({ error: 'Official email is required (it is the sign-in ID).' });
+      const role = String(body.role ?? body.designation ?? '').trim();
+      if (!role) return res.status(400).json({ error: 'Designation is required.' });
+      body.role = role; delete body.designation;
+
+      const companyId = Number(body.company_id || body.companyId || 0) || (scope !== 'all' ? Number(scope) : 0);
+      if (!companyId) return res.status(400).json({ error: 'Choose the company this employee belongs to.' });
+      if (scope !== 'all' && companyId !== Number(scope)) return res.status(403).json({ error: 'You can only add employees to your own company.' });
+      if (isPrivilegedRole(role) && scope !== 'all') return res.status(403).json({ error: 'Only the group MD can create MD, CEO, HR or Admin accounts.' });
+      const company = (await dbq('SELECT id, name FROM companies WHERE id = ?', [companyId]))[0];
+      if (!company) return res.status(400).json({ error: 'That company does not exist.' });
+
+      const requestedCode = String(body.emp_code || body.empCode || '').trim().toUpperCase();
+      delete body.emp_code; delete body.empCode; delete body.company_id; delete body.companyId;
+
+      const columns = await new Promise((resolve) => getUserColumns(resolve));
+      const { sets, params, errors, skipped } = buildEmployeeUpdate(body, columns);
+      if (errors.length) return res.status(400).json({ error: errors.join('; ') });
+      const values = {};
+      sets.forEach((s, i) => { values[s.replace(/ = \?$/, '')] = params[i]; });
+
+      if ((await dbq('SELECT id FROM users WHERE LOWER(email) = ?', [values.email])).length) {
+        return res.status(400).json({ error: `${values.email} is already used by another account.` });
+      }
+      if (values.reporting_manager_id) {
+        const m = await resolveManager(values.reporting_manager_id, companyId, null);
+        if (columns.has('reporting_manager')) values.reporting_manager = m.name;
+      }
+      let empCode = requestedCode;
+      if (empCode) {
+        if (!/^[A-Z0-9][A-Z0-9-_/]{1,29}$/.test(empCode)) return res.status(400).json({ error: 'Employee ID can use letters, digits and - only (e.g. RRD-013).' });
+        if ((await dbq('SELECT id FROM users WHERE UPPER(emp_code) = ?', [empCode])).length) return res.status(400).json({ error: `Employee ID ${empCode} is already taken.` });
+      } else {
+        empCode = await nextEmpCode(companyId);
+      }
+      const password = tempPassword();
+      const defaults = { department: '', attendance_type: 'OFFICE', attendance_mode: 'OFFICE', employment_type: 'Full-time', monthly_salary: 0, hra: 0, allowances: 0, deductions: 0 };
+      Object.entries(defaults).forEach(([c, v]) => { if (columns.has(c) && values[c] === undefined) values[c] = v; });
+      Object.assign(values, { company_id: companyId, emp_code: empCode, password });
+      if (columns.has('company_name')) values.company_name = company.name;
+      const cols = Object.keys(values).filter((c) => columns.has(c));
+      let result;
+      try {
+        result = await dbq(`INSERT INTO users (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`, cols.map((c) => values[c]));
+      } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY' || /UNIQUE/i.test(err.message)) return res.status(400).json({ error: 'That email or employee ID is already used by another account.' });
+        throw err;
+      }
+      const rows = await dbq(selectEmployeeSql(columns, 'WHERE u.id = ?'), [result.insertId]);
+      res.status(201).json({
+        message: `${values.name} added as ${empCode}.`,
+        id: result.insertId,
+        emp_code: empCode,
+        temporaryPassword: password,
+        employee: rows[0] ? formatEmployeeRow(rows[0]) : null,
+        notSaved: skipped,
+      });
+    } catch (e) {
+      if (/reporting manager|report to/i.test(e.message)) return res.status(400).json({ error: e.message });
+      console.error('Add employee error:', e);
+      res.status(500).json({ error: 'The employee could not be added. Please try again.' });
+    }
+  });
+
   // ---------- PUT: Update employee (core fields, compensation, bank, statutory) — MD / company CEO ----------
   router.put('/employees/:id', authenticate, (req, res) => {
     withTargetEmployee(req, res, 'edit', (target, { scope }) => {
@@ -303,10 +489,20 @@ module.exports = function(db, authenticate, getLocalDateTime, calculateDistance,
           && (isPrivilegedRole(newRole) || isPrivilegedRole(target.role)) && scope !== 'all') {
         return res.status(403).json({ error: 'Only the group MD can change an access role (MD, CEO, HR or Admin).' });
       }
-      getUserColumns((columns) => {
-        const { sets, params, errors } = buildEmployeeUpdate(req.body, columns);
+      getUserColumns(async (columns) => {
+        const { sets, params, errors, skipped } = buildEmployeeUpdate(req.body, columns);
         if (errors.length) return res.status(400).json({ error: errors.join('; ') });
-        if (sets.length === 0) return res.status(400).json({ error: 'Nothing to update' });
+        if (sets.length === 0) {
+          if (skipped.length) return res.status(400).json({ error: `${skipped.join(', ')} cannot be saved until the database is updated (run scripts/add-profile-columns.js --apply).` });
+          return res.status(400).json({ error: 'Nothing to update' });
+        }
+        const mi = sets.indexOf('reporting_manager_id = ?');
+        if (mi >= 0) {
+          try {
+            const m = await resolveManager(params[mi], target.company_id, target.id);
+            if (columns.has('reporting_manager') && !sets.includes('reporting_manager = ?')) { sets.push('reporting_manager = ?'); params.push(m ? m.name : null); }
+          } catch (e) { return res.status(400).json({ error: e.message }); }
+        }
         db.query(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`, [...params, target.id], (err) => {
           if (err) {
             if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'That email is already used by another account.' });
@@ -314,8 +510,8 @@ module.exports = function(db, authenticate, getLocalDateTime, calculateDistance,
             return res.status(500).json({ error: 'Failed to update employee details' });
           }
           db.query(selectEmployeeSql(columns, 'WHERE u.id = ?'), [target.id], (fetchErr, rows) => {
-            if (!fetchErr && rows?.length) return res.json({ message: 'Employee updated successfully!', employee: formatEmployeeRow(rows[0]) });
-            res.json({ message: 'Employee updated successfully!' });
+            if (!fetchErr && rows?.length) return res.json({ message: 'Employee updated successfully!', employee: formatEmployeeRow(rows[0]), notSaved: skipped });
+            res.json({ message: 'Employee updated successfully!', notSaved: skipped });
           });
         });
       });

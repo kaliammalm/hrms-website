@@ -89,8 +89,7 @@ lint/tmp/
 # Android Profiling
 *.hprof
 
-# Cordova plugins for Capacitor
-capacitor-cordova-android-plugins
+# Cordova plugins for Capacitor: kept in git (the build needs this folder)
 
 # Copied web assets
 app/src/main/assets/public
@@ -99,3 +98,8 @@ app/src/main/assets/public
 app/src/main/assets/capacitor.config.json
 app/src/main/assets/capacitor.plugins.json
 app/src/main/res/xml/config.xml
+
+# Release signing: never commit
+*.jks
+*.keystore
+keystore.properties

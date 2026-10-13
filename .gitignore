@@ -27,3 +27,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# Android release signing: never commit
+*.jks
+*.keystore
+keystore.properties
+keystore-base64.txt
+
+# Stray copies
+/public/android

@@ -1,10 +1,19 @@
-# Builds the RRD Group HRMS Android app (APK) on GitHub's servers.
-# Run it: GitHub → Actions → "Build Android APK" → Run workflow.
-# Download: the run's "Artifacts" section, or the "Latest Android build" release (manual runs).
+# Builds the RRD Group HRMS Android app on GitHub's servers.
+#   Signed release APK (R8 code shrinking + resource shrinking) when the 4 signing secrets are set,
+#   otherwise a debug APK so the button always gives you something to test.
+# Run it:   GitHub → Actions → "Build Android APK" → Run workflow
+# Download: the run's "Artifacts" section, or Releases → "Latest Android build" (manual runs)
+#
+# Secrets (Settings → Secrets and variables → Actions → New repository secret):
+#   ANDROID_KEYSTORE_BASE64    the .jks file as base64 (scripts/make-release-key.bat writes it)
+#   ANDROID_KEYSTORE_PASSWORD  keystore password
+#   ANDROID_KEY_ALIAS          rrd-hrms
+#   ANDROID_KEY_PASSWORD       same as the keystore password
+# Optional variable: API_URL (defaults to the Render backend)
 name: Build Android APK
 
 on:
-  workflow_dispatch:            # the one-click "Run workflow" button
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -14,10 +23,11 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'capacitor.config.ts'
+      - '.env.production'
       - '.github/workflows/android-apk.yml'
 
 permissions:
-  contents: write               # needed to publish the release with the APK
+  contents: write               # publish the "Latest Android build" release
 
 concurrency:
   group: android-apk
@@ -28,10 +38,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      # The web app is built into the APK; this is the backend it talks to.
-      # Override with a repository variable API_URL (Settings → Secrets and variables → Actions → Variables).
       REACT_APP_API_URL: ${{ vars.API_URL || 'https://hrms-backend-v3.onrender.com' }}
-      CI: false                 # stop Create React App treating lint warnings as errors
+      GENERATE_SOURCEMAP: false # no .map files in the app (about 1.5 MB)
+      CI: false                 # Create React App: lint warnings are not errors
+      VERSION_CODE: ${{ github.run_number }}
+      HAS_SIGNING: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
 
     steps:
       - name: Get the code
@@ -47,10 +58,13 @@ jobs:
         run: npm ci || npm install   # falls back if package-lock.json is out of date
 
       - name: Build the web app
-        run: npm run build
+        run: |
+          rm -rf public/android      # stray Android project copy: must never ship inside the web app
+          npm run build
+          find build -name '*.map' -delete
+          du -sh build
 
       - name: Restore Capacitor's Cordova plugin project if missing
-        # android/.gitignore excludes this folder, so a fresh checkout does not have it
         run: |
           DIR=android/capacitor-cordova-android-plugins
           if [ ! -f "$DIR/build.gradle" ]; then
@@ -62,6 +76,10 @@ jobs:
       - name: Copy the web app into the Android project
         run: npx cap sync android
 
+      - name: Drop duplicate dark-mode splash screens
+        # The dark splash is the same image as the light one; Android falls back to the light set
+        run: rm -rf android/app/src/main/res/drawable-night android/app/src/main/res/drawable-*-night-*
+
       - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
@@ -69,25 +87,48 @@ jobs:
           java-version: 21
           cache: gradle
 
-      - name: Number this build
-        # Each build gets a higher versionCode so phones install it as an update
+      - name: Unpack the signing key
+        if: env.HAS_SIGNING == 'true'
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
-          sed -i -E "s/versionCode [0-9]+/versionCode ${{ github.run_number }}/" android/app/build.gradle
-          sed -i -E "s/versionName \"([0-9.]+)\"/versionName \"\1.${{ github.run_number }}\"/" android/app/build.gradle
-          grep -E "versionCode|versionName" android/app/build.gradle
+          echo "$KEYSTORE_B64" | tr -d '\r\n ' | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
 
-      - name: Build the APK
+      - name: Build the signed release APK (R8)
+        if: env.HAS_SIGNING == 'true'
         working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleRelease --no-daemon --stacktrace
+          mkdir -p ../dist
+          cp app/build/outputs/apk/release/app-release.apk ../dist/RRD-Group-HRMS.apk
 
-      - name: Name the APK
+      - name: Build a debug APK (signing secrets not set)
+        if: env.HAS_SIGNING != 'true'
+        working-directory: android
         run: |
-          mkdir -p dist
-          cp android/app/build/outputs/apk/debug/app-debug.apk "dist/RRD-Group-HRMS-build-${{ github.run_number }}.apk"
-          cp android/app/build/outputs/apk/debug/app-debug.apk dist/RRD-Group-HRMS.apk   # fixed name for the release link
-          ls -la dist
+          echo "::warning::Signing secrets are not set, so this is a DEBUG build. Add the 4 ANDROID_* secrets for a signed release."
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+          mkdir -p ../dist
+          cp app/build/outputs/apk/debug/app-debug.apk ../dist/RRD-Group-HRMS.apk
+
+      - name: Check the APK
+        run: |
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
+          "$APKSIGNER" verify --print-certs dist/RRD-Group-HRMS.apk | grep -E "Signer #1 certificate (DN|SHA-256)" || true
+          SIZE=$(du -k dist/RRD-Group-HRMS.apk | cut -f1)
+          echo "### Android build ${{ github.run_number }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Type: $([ "$HAS_SIGNING" = true ] && echo 'signed release (R8)' || echo 'debug')" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Size: ${SIZE} KB" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backend: $REACT_APP_API_URL" >> "$GITHUB_STEP_SUMMARY"
+          cp dist/RRD-Group-HRMS.apk "dist/RRD-Group-HRMS-build-${{ github.run_number }}.apk"
+          rm -f "$RUNNER_TEMP/release.jks"
 
       - name: Attach the APK to this run
         uses: actions/upload-artifact@v4
@@ -104,7 +145,7 @@ jobs:
           name: Latest Android build
           make_latest: true
           body: |
-            Build ${{ github.run_number }} from commit ${{ github.sha }}.
+            Build ${{ github.run_number }} (version 1.0.${{ github.run_number }}) from commit ${{ github.sha }}.
+            ${{ env.HAS_SIGNING == 'true' && 'Signed release build.' || 'Debug build (signing secrets not set).' }}
             Backend: ${{ env.REACT_APP_API_URL }}
-            Debug build: for testing. Install by opening the APK and allowing "Install unknown apps".
           files: dist/RRD-Group-HRMS.apk

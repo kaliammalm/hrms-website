@@ -13,29 +13,50 @@ function Login({ onLogin }) {
     setLoading(true);
     setError('');
 
+    // No backend address baked into this build (frontend/.env or .env.production missing)
+    if (!API_BASE) {
+      setError('This app was built without a server address. Add REACT_APP_API_URL to frontend/.env.production and rebuild.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const response = await fetch(`${API_BASE}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      
-      const data = await response.json();
-      console.log("Backend Login Full Response:", data);
-      
+      // Render's free plan sleeps when idle; the first request can take up to a minute
+      const controller = new AbortController();
+      const slowTimer = setTimeout(() => setError('Waking up the server, this can take up to a minute…'), 6000);
+      const abortTimer = setTimeout(() => controller.abort(), 90000);
+      let response;
+      try {
+        response = await fetch(`${API_BASE}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(slowTimer);
+        clearTimeout(abortTimer);
+        setError('');
+      }
+
+      const raw = await response.text();
+      let data = null;
+      try { data = raw ? JSON.parse(raw) : {}; } catch (parseErr) { data = null; }
+
+      if (!data) {
+        // Got a web page instead of the API's JSON: wrong address, or the backend isn't deployed there
+        setError(response.status === 404
+          ? `The server at ${API_BASE} has no sign-in service (error 404). The backend may not be deployed correctly.`
+          : `The server at ${API_BASE} sent an unexpected reply (error ${response.status}). Check that the backend is deployed and running.`);
+        return;
+      }
+
       if (response.ok) {
         const tokenValue = data.token || data.accessToken || data.jwt;
-        
-        if (tokenValue) {
-          localStorage.setItem('token', tokenValue);
-          console.log("Token successfully saved to localStorage:", tokenValue);
-        } else {
-          console.warn("WARNING: Backend response did not include a recognized token field!");
-        }
+        if (tokenValue) localStorage.setItem('token', tokenValue);
 
-        const userData = data.user || data; 
+        const userData = data.user || data;
         const resolvedUserId = userData.id || userData.user_id || userData.employee_id;
-        console.log("user data", userData);
 
         localStorage.setItem('user', JSON.stringify({
           id: resolvedUserId,
@@ -47,11 +68,13 @@ function Login({ onLogin }) {
 
         onLogin(userData);
       } else {
-        setError(data.error || data.message || 'Login failed');
+        setError(data.error || data.message || `Sign-in failed (error ${response.status}).`);
       }
     } catch (err) {
-      console.error("Login catch error:", err);
-      setError('Server error. Check if backend is running.');
+      console.error('Login error:', err);
+      setError(err?.name === 'AbortError'
+        ? `The server at ${API_BASE} did not respond in time. Please try again in a minute.`
+        : `Could not reach the server at ${API_BASE}. Check your internet connection, or the server may be down.`);
     } finally {
       setLoading(false);
     }
@@ -64,7 +87,7 @@ function Login({ onLogin }) {
         <div className="hr-brand" style={{ padding: 0, border: 0 }}>
           <div className="hr-brand-mark">H</div>
           <div>
-            <div className="hr-brand-name">HRMS Enterprise</div>
+            <div className="hr-brand-name">RRD Group HRMS</div>
             <div className="hr-brand-sub">Group workforce portal</div>
           </div>
         </div>

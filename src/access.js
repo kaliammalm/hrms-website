@@ -25,7 +25,8 @@ const STAFF_MENUS = ['Dashboard', 'Field Visits', 'My Attendance', 'Leave Reques
 const MENU_ACCESS = {
   MD: '*',
   ADMIN: '*',
-  CEO: ['Dashboard', 'Employees', 'Attendance', 'My Attendance', 'Field Tracking', 'Leave Requests', 'Payroll', 'Payslips',
+  // CEO: 'Leave Management' = approvals for their own company; 'Leave Requests' = their own requests
+  CEO: ['Dashboard', 'Employees', 'Attendance', 'My Attendance', 'Field Tracking', 'Leave Management', 'Leave Requests', 'Payroll', 'Payslips',
     'Recruitment', 'Performance', 'Reports', 'Approvals', 'Settings'],
   HR: ['Dashboard', 'Employees', 'Attendance', 'My Attendance', 'Field Tracking', 'Leave Requests', 'Payroll', 'Payslips',
     'Performance', 'Settings'],

@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { Plus, Check, X, CalendarDays, AlertCircle, Briefcase, House } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Plus, Check, X, CalendarDays, AlertCircle, Briefcase, House, RefreshCw, RotateCcw } from 'lucide-react';
 import { PageHeader, Panel, StatusPill, Avatar, TableEmpty, Modal, Field } from './ui';
 
 // Request types. On-Duty and Work From Home use the same approval flow as leave,
@@ -55,16 +55,35 @@ function LeaveManagementTab({
   onRetryLeaves,
   leaveSubmitting = false,
   leaveFormError = '',
-  setLeaveFormError
+  setLeaveFormError,
+  mode,                     // 'approvals' | 'mine' (MDDashboard decides from the role and menu)
+  scopeLabel = '',
+  showCompany = true,
+  allLeavesState = { loading: false, error: '' },
+  onReloadAll,
+  decidingId = null,
 }) {
 
   const normalizedRole = (userRole || '').toUpperCase();
   // MD view: the group-wide list is loaded (and re-loaded per selected company) by MDDashboard.
   // Everyone else: "My requests" comes from GET /api/leaves?mine=1, also loaded by MDDashboard,
   // so it survives a page refresh. Re-check whenever this page is opened.
+  const isApprovals = mode ? mode === 'approvals' : normalizedRole === 'MD';
   useEffect(() => {
-    if (normalizedRole !== 'MD' && onRetryLeaves) onRetryLeaves();
-  }, [normalizedRole]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (isApprovals) { if (onReloadAll) onReloadAll(); }
+    else if (onRetryLeaves) onRetryLeaves();
+  }, [isApprovals]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Approvals view: Pending first; decided requests stay reviewable
+  const [filter, setFilter] = useState('Pending');
+  const [changing, setChanging] = useState(null); // id of a decided row being changed
+  const queue = useMemo(() => (allLeaves || []).filter((l) => normalizedRole === 'MD' || !l.isMine), [allLeaves, normalizedRole]);
+  const counts = useMemo(() => ({
+    Pending: queue.filter((l) => (l.status || 'Pending') === 'Pending').length,
+    Decided: queue.filter((l) => (l.status || 'Pending') !== 'Pending').length,
+    All: queue.length,
+  }), [queue]);
+  const shown = queue.filter((l) => filter === 'All' || (filter === 'Pending' ? (l.status || 'Pending') === 'Pending' : (l.status || 'Pending') !== 'Pending'));
 
   const openForm = () => { if (setLeaveFormError) setLeaveFormError(''); setShowLeaveModal(true); };
   const closeForm = () => { if (setLeaveFormError) setLeaveFormError(''); setShowLeaveModal(false); };
@@ -79,17 +98,27 @@ function LeaveManagementTab({
   };
 
   const isMD = normalizedRole === 'MD';
-  const canApplyLeave = !isMD;
+  const canApplyLeave = !isApprovals && !isMD;
 
   // Visual-only counts for the header
-  const rowsInView = (isMD ? allLeaves : myLeaves) || [];
+  const rowsInView = (isApprovals ? queue : myLeaves) || [];
   const pendingCount = rowsInView.filter(l => !l.status || l.status === 'Pending').length;
+  const colCount = showCompany ? 8 : 7;
+  const fmtDecided = (l) => {
+    if (!l.decided_by_name) return '';
+    const d = String(l.decided_at || '').slice(0, 10);
+    return `by ${l.decided_by_name}${d ? ` · ${d}` : ''}`;
+  };
 
   return (
     <div>
       <PageHeader
-        title={isMD ? 'Leave approvals' : 'Leave & attendance requests'}
-        subtitle={isMD ? 'Review and decide on leave, On-Duty and Work From Home requests from across the group.' : 'Apply for leave, On-Duty (OD) or Work From Home (WFH) and track the status of your requests.'}
+        title={isApprovals ? 'Leave approvals' : 'Leave & attendance requests'}
+        subtitle={isApprovals
+          ? (isMD
+            ? `Review and decide on leave, On-Duty and Work From Home requests${scopeLabel && scopeLabel !== 'All Companies' ? ` for ${scopeLabel}` : ' from across the group'}.`
+            : `Requests from ${scopeLabel || 'your company'}. Your own requests are decided by the MD.`)
+          : 'Apply for leave, On-Duty (OD) or Work From Home (WFH) and track the status of your requests.'}
         actions={canApplyLeave && (
           <button type="button" className="hr-btn hr-btn-primary" onClick={openForm}>
             <Plus size={16} /> New request
@@ -99,8 +128,23 @@ function LeaveManagementTab({
 
       <Panel
         flush
-        title={isMD ? 'Team requests' : 'My requests'}
-        actions={rowsInView.length > 0 && (
+        title={isApprovals ? 'Team requests' : 'My requests'}
+        actions={isApprovals ? (
+          <div className="hr-leave-filters">
+            <div className="hr-seg" role="radiogroup" aria-label="Show">
+              {['Pending', 'Decided', 'All'].map((f) => (
+                <button key={f} type="button" role="radio" aria-checked={filter === f} className={filter === f ? 'is-on' : ''} onClick={() => setFilter(f)}>
+                  {f}{counts[f] ? <span className="hr-seg-count">{counts[f]}</span> : null}
+                </button>
+              ))}
+            </div>
+            {onReloadAll && (
+              <button type="button" className="hr-btn hr-btn-ghost hr-btn-sm hr-btn-icon" onClick={onReloadAll} disabled={allLeavesState.loading} title="Refresh" aria-label="Refresh requests">
+                <RefreshCw size={14} />
+              </button>
+            )}
+          </div>
+        ) : rowsInView.length > 0 && (
           <div style={{ display: 'flex', gap: 8 }}>
             <StatusPill tone="neutral" dot={false}>{rowsInView.length} total</StatusPill>
             {pendingCount > 0 && <StatusPill tone="warning">{pendingCount} pending</StatusPill>}
@@ -108,7 +152,7 @@ function LeaveManagementTab({
         )}
       >
         <div className="hr-table-wrap">
-          {!isMD ? (
+          {!isApprovals ? (
             <table className="hr-table">
               <thead>
                 <tr>
@@ -152,11 +196,11 @@ function LeaveManagementTab({
               </tbody>
             </table>
           ) : (
-            <table className="hr-table">
+            <table className="hr-table hr-table-cards">
               <thead>
                 <tr>
                   <th>Employee</th>
-                  <th>Company</th>
+                  {showCompany && <th>Company</th>}
                   <th>Type</th>
                   <th>From</th>
                   <th>To</th>
@@ -166,40 +210,74 @@ function LeaveManagementTab({
                 </tr>
               </thead>
               <tbody>
-                {!allLeaves || allLeaves.length === 0 ? (
+                {allLeavesState.error && !queue.length ? (
+                  <tr>
+                    <td colSpan={colCount}>
+                      <div className="hr-form-alert is-error" style={{ margin: 12 }}>
+                        <AlertCircle size={16} /> <div>{allLeavesState.error}</div>
+                        {onReloadAll && <button type="button" className="hr-btn hr-btn-ghost hr-btn-sm" onClick={onReloadAll}>Try again</button>}
+                      </div>
+                    </td>
+                  </tr>
+                ) : allLeavesState.loading && !queue.length ? (
+                  <TableEmpty colSpan={colCount} icon={<CalendarDays size={20} />} title="Loading requests" text="Fetching requests from the server…" />
+                ) : shown.length === 0 ? (
                   <TableEmpty
-                    colSpan={8}
+                    colSpan={colCount}
                     icon={<CalendarDays size={20} />}
-                    title="No leave requests to review"
-                    text="New requests from your teams will appear here."
+                    title={filter === 'Pending' ? 'Nothing waiting for a decision' : 'No requests here'}
+                    text={filter === 'Pending' ? 'New leave, On-Duty and Work From Home requests from your teams will appear here.' : 'Decided requests appear here once you approve or reject them.'}
                   />
                 ) : (
-                  allLeaves.map(l => {
+                  shown.map(l => {
+                    const id = l.id || l._id;
                     const empName = l.employee_name || l.employeeName || `Emp #${l.employee_id}`;
-                    const compName = l.companyName || l.company_name || 'Fractio Hospitality';
+                    const compName = l.companyName || l.company_name || 'Unassigned';
+                    const status = l.status || 'Pending';
+                    // Server says who may decide; older servers do not send it, so fall back to "pending"
+                    const canDecide = l.canDecide !== undefined ? l.canDecide : true;
+                    const showButtons = canDecide && (status === 'Pending' || changing === id);
+                    const busy = decidingId === id;
                     return (
-                      <tr key={l.id || l._id}>
+                      <tr key={id}>
                         <td>
                           <div className="hr-cell-person" style={{ minWidth: 170 }}>
                             <Avatar name={empName} size={30} />
-                            <span className="hr-cell-person-name">{empName}</span>
+                            <div style={{ minWidth: 0 }}>
+                              <span className="hr-cell-person-name">{empName}</span>
+                              {l.employee_role && <div className="hr-cell-sub">{l.employee_role}</div>}
+                            </div>
                           </div>
                         </td>
-                        <td className="is-muted" style={{ whiteSpace: 'nowrap' }}>{compName}</td>
-                        <td className="is-strong" style={{ whiteSpace: 'nowrap' }}><TypeCell type={l.type || l.leave_type} /></td>
-                        <td className="num">{formatDate(l.start_date || l.from_date || l.fromDate || l.from)}</td>
-                        <td className="num">{formatDate(l.end_date || l.to_date || l.toDate || l.to)}</td>
-                        <td className="is-muted"><div className="hr-truncate" style={{ maxWidth: 160 }} title={l.reason || ''}>{l.reason || '-'}</div></td>
-                        <td><StatusPill status={l.status || 'Pending'} /></td>
-                        <td className="is-actions">
-                          <div className="hr-row-actions">
-                            <button type="button" className="hr-btn hr-btn-success-soft hr-btn-sm hr-btn-icon" title="Approve" aria-label={`Approve leave for ${empName}`} onClick={() => handleLeaveAction(l.id || l._id, 'Approved')}>
-                              <Check size={15} />
+                        {showCompany && <td className="is-muted" data-label="Company" style={{ whiteSpace: 'nowrap' }}>{compName}</td>}
+                        <td className="is-strong" data-label="Type" style={{ whiteSpace: 'nowrap' }}><TypeCell type={l.type || l.leave_type} /></td>
+                        <td className="num" data-label="From">{formatDate(l.start_date || l.from_date || l.fromDate || l.from)}</td>
+                        <td className="num" data-label="To">{formatDate(l.end_date || l.to_date || l.toDate || l.to)}</td>
+                        <td className="is-muted is-reason" data-label="Reason"><div className="hr-truncate" style={{ maxWidth: 200 }} title={l.reason || ''}>{l.reason || '-'}</div></td>
+                        <td data-label="Status">
+                          <StatusPill status={status} />
+                          {status !== 'Pending' && fmtDecided(l) && <div className="hr-cell-sub">{fmtDecided(l)}</div>}
+                        </td>
+                        <td className="is-actions" data-label="">
+                          {showButtons ? (
+                            <div className="hr-row-actions">
+                              <button type="button" className="hr-btn hr-btn-success-soft hr-btn-sm" disabled={busy || !!decidingId} aria-label={`Approve request from ${empName}`}
+                                onClick={() => { setChanging(null); handleLeaveAction(id, 'Approved'); }}>
+                                <Check size={15} /> {busy ? '…' : 'Approve'}
+                              </button>
+                              <button type="button" className="hr-btn hr-btn-danger-soft hr-btn-sm" disabled={busy || !!decidingId} aria-label={`Reject request from ${empName}`}
+                                onClick={() => { setChanging(null); handleLeaveAction(id, 'Rejected'); }}>
+                                <X size={15} /> Reject
+                              </button>
+                              {changing === id && <button type="button" className="hr-btn hr-btn-ghost hr-btn-sm" onClick={() => setChanging(null)}>Cancel</button>}
+                            </div>
+                          ) : canDecide ? (
+                            <button type="button" className="hr-btn hr-btn-ghost hr-btn-sm" onClick={() => setChanging(id)} aria-label={`Change decision for ${empName}`}>
+                              <RotateCcw size={13} /> Change
                             </button>
-                            <button type="button" className="hr-btn hr-btn-danger-soft hr-btn-sm hr-btn-icon" title="Reject" aria-label={`Reject leave for ${empName}`} onClick={() => handleLeaveAction(l.id || l._id, 'Rejected')}>
-                              <X size={15} />
-                            </button>
-                          </div>
+                          ) : (
+                            <span className="hr-cell-sub">{status === 'Pending' ? 'Awaiting MD' : '—'}</span>
+                          )}
                         </td>
                       </tr>
                     );

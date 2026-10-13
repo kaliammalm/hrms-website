@@ -21,15 +21,15 @@ import CompaniesTab from './CompaniesTab';
 import EmployeesTab from './EmployeesTab';
 import AttendanceTab from './AttendanceTab';
 import LeaveManagementTab from './LeaveManagementTab';
-import PayrollTab from './PayrollTab';
 import RecruitmentTab from './RecruitmentTab';
 import PerformanceTab from './PerformanceTab';
 import ReportsTab from './ReportsTab';
 import ApprovalsTab from './ApprovalsTab';
-import Payslips from './Payslip';
 import Celebrations from './Celebrations';
 import FieldVisits, { FieldTodayCard } from './field/FieldVisits';
 import FieldTracking from './field/FieldTracking';
+import PayrollModule from './payroll/PayrollModule';
+import MyPayslips from './payroll/MyPayslips';
 import { getCompanyBrand } from './brand';
 import { getEffectiveRole, getRoleLabel, canAccessMenu } from './access';
 import { Panel, EmptyState, Restricted, PageHeader } from './ui';
@@ -44,8 +44,9 @@ const COMPANIES_LIST = [
 function MDDashboard({ user, onLogout }) {
   // 'MD' for anyone with group access (MD account, Vasumathi); otherwise their own role
   const userRole = getEffectiveRole(user);
-  const userCompanyId = user?.company_id || user?.companyId || 3;
-  const employeeId = user?.id || 1;
+  // No silent fallbacks to another company / employee: missing values stay empty
+  const userCompanyId = user?.company_id || user?.companyId || null;
+  const employeeId = user?.id ?? null;
 
   const isAuthorizedForEmployees = ['CEO', 'HR', 'ADMIN', 'MD'].includes(userRole);
   // Field / multi-site staff (set by the field attendance migration)
@@ -124,6 +125,8 @@ function MDDashboard({ user, onLogout }) {
   const [leaveSubmitting, setLeaveSubmitting] = useState(false);
   const [leaveFormError, setLeaveFormError] = useState('');
   const [allLeaves, setAllLeaves] = useState([]);
+  const [allLeavesState, setAllLeavesState] = useState({ loading: false, error: '' });
+  const [decidingId, setDecidingId] = useState(null);
 
   const [stats, setStats] = useState({
     totalCompanies: 3,
@@ -222,15 +225,6 @@ function MDDashboard({ user, onLogout }) {
           setAttendanceRecords(attData);
         }
 
-        if (['HR', 'MD', 'CEO', 'ADMIN'].includes(userRole)) {
-          const leaveRes = await fetch(`${API_BASE}/api/leaves?companyId=${compIdParam}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const leaveData = await leaveRes.json();
-          if (isMounted && Array.isArray(leaveData)) {
-            setAllLeaves(leaveData);
-          }
-        }
       } catch (err) {
         console.log('Attendance/Leaves fetch error:', err);
       }
@@ -242,6 +236,25 @@ function MDDashboard({ user, onLogout }) {
       isMounted = false;
     };
   }, [selectedCompanyName, userRole, getSelectedCompanyId]);
+
+  // Requests to review: the whole group (or the company picked in the header) for the MD,
+  // the CEO's / HR's own company for them. The server applies the same limits.
+  const loadAllLeaves = useCallback(async () => {
+    if (!['HR', 'MD', 'CEO', 'ADMIN'].includes(userRole)) return;
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    const compIdParam = selectedCompanyName === 'All Companies' ? 'all' : getSelectedCompanyId();
+    setAllLeavesState({ loading: true, error: '' });
+    try {
+      const res = await fetch(`${API_BASE}/api/leaves?companyId=${compIdParam}`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const data = await res.json().catch(() => null);
+      if (res.ok && Array.isArray(data)) { setAllLeaves(data); setAllLeavesState({ loading: false, error: '' }); }
+      else setAllLeavesState({ loading: false, error: (data && data.error) || 'Requests could not be loaded.' });
+    } catch (err) {
+      setAllLeavesState({ loading: false, error: 'The server could not be reached, so requests could not be loaded.' });
+    }
+  }, [userRole, selectedCompanyName, getSelectedCompanyId]);
+  useEffect(() => { loadAllLeaves(); }, [loadAllLeaves]);
 
   useEffect(() => {
     let isMounted = true;
@@ -312,7 +325,8 @@ function MDDashboard({ user, onLogout }) {
   };
 
   const handleCheckIn = async () => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    // India date (toISOString() is UTC and gives yesterday's date before 5:30 AM)
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
     const alreadyCheckedIn = attendanceRecords.some(r => {
       const recordDate = r.date ? r.date.split('T')[0] : '';
       return recordDate === todayStr && (r.employee_id === employeeId || r.employeeId === employeeId);
@@ -369,11 +383,14 @@ function MDDashboard({ user, onLogout }) {
       },
       body: JSON.stringify({ checkOut: timeStr })
     })
-      .then(res => res.json())
-      .then(() => {
-        setAttendanceRecords(attendanceRecords.map(rec => (rec.id === id || rec._id === id) ? { ...rec, checkOut: timeStr, check_out: timeStr, status: 'Checked Out' } : rec));
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { alert(data.error || 'Check-out could not be saved. Please try again.'); return; }
+        // Show the time the server recorded (it uses its own clock)
+        const saved = data.checkOut || timeStr;
+        setAttendanceRecords(list => list.map(rec => (rec.id === id || rec._id === id) ? { ...rec, checkOut: saved, check_out: saved, status: 'Checked Out' } : rec));
       })
-      .catch(err => console.log(err));
+      .catch(() => alert('The server could not be reached, so you were not checked out. Please try again.'));
   };
 
   // The signed-in user's own leave requests, always read back from the database
@@ -441,8 +458,10 @@ function MDDashboard({ user, onLogout }) {
   };
 
   const handleLeaveAction = async (leaveId, newStatus) => {
+    if (decidingId) return; // one decision at a time
     const token = localStorage.getItem('token');
     const previous = allLeaves;
+    setDecidingId(leaveId);
     setAllLeaves(list => list.map(l => l.id === leaveId ? { ...l, status: newStatus } : l));
     try {
       const res = await fetch(`${API_BASE}/api/leaves/${leaveId}`, {
@@ -453,14 +472,18 @@ function MDDashboard({ user, onLogout }) {
         },
         body: JSON.stringify({ status: newStatus })
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
         setAllLeaves(previous);
         alert(data.error || 'The decision could not be saved. Please try again.');
+      } else {
+        setAllLeaves(list => list.map(l => l.id === leaveId ? { ...l, status: data.status || newStatus, decided_by_name: data.decidedBy || l.decided_by_name, decided_at: new Date().toISOString() } : l));
       }
     } catch (err) {
       setAllLeaves(previous);
       alert('The server could not be reached, so the decision was not saved.');
+    } finally {
+      setDecidingId(null);
     }
   };
 
@@ -649,6 +672,13 @@ function MDDashboard({ user, onLogout }) {
       case 'Leave Management':
         return (
           <LeaveManagementTab
+            // MD: always the approvals view. CEO: "Leave Approvals" = own company, "My Leave Requests" = own.
+            mode={userRole === 'MD' || activeMenu === 'Leave Management' ? 'approvals' : 'mine'}
+            scopeLabel={userRole === 'MD' ? selectedCompanyName : getCompanyNameById(userCompanyId)}
+            showCompany={userRole === 'MD' && selectedCompanyName === 'All Companies'}
+            allLeavesState={allLeavesState}
+            onReloadAll={loadAllLeaves}
+            decidingId={decidingId}
             userRole={userRole}
             myLeaves={myLeaves}
             setMyLeaves={setMyLeaves}
@@ -676,30 +706,17 @@ function MDDashboard({ user, onLogout }) {
         );
 
       case 'Payroll':
+        // Payroll module: pay runs, salary structures, statutory settings (backend /api/pay)
         return (
-          <PayrollTab 
-            selectedCompany={selectedCompanyName} 
-            onBack={() => {
-              if (previousCompanyContext) {
-                setActiveCompanyDashboard(previousCompanyContext);
-                setSelectedCompany(previousCompanyContext.name);
-                localStorage.setItem('hrms_selected_company', previousCompanyContext.name);
-                setActiveMenu('Dashboard');
-                setPreviousCompanyContext(null);
-              } else {
-                handleMenuChange('Dashboard');
-              }
-            }} 
+          <PayrollModule
+            companyId={selectedCompanyName === 'All Companies' ? 'all' : getSelectedCompanyId()}
+            selectedCompany={selectedCompanyName}
+            userRole={userRole}
           />
         );
 
       case 'Payslips':
-        return (
-          <Payslips 
-            user={user} 
-            onHeadBack={() => handleMenuChange('Dashboard')} 
-          />
-        );
+        return <MyPayslips user={user} />;
 
       case 'Recruitment':
         return <RecruitmentTab />;

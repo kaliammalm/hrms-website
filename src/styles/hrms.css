@@ -691,3 +691,32 @@ button.hr-list-row:hover { background: var(--surface-2); color: var(--ink); }
 .hr-req-type { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .hr-req-type.is-wfh { background: #e8f1fd; color: #1d4f91; }
 .hr-req-type.is-od { background: #efeafd; color: #4b2c94; }
+
+/* ----- Leave approvals: filter and decision details ---------------------- */
+.hr-leave-filters { display: flex; align-items: center; gap: 6px; }
+.hr-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 9px; background: var(--neutral-bg); }
+.hr-seg button { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border: 0; border-radius: 7px; background: transparent; color: var(--text-2); font: inherit; font-size: var(--fs-xs); font-weight: 500; cursor: pointer; }
+.hr-seg button.is-on { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: var(--shadow-1); }
+.hr-seg button:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.hr-seg-count { min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--primary-50); color: var(--primary); font-size: 11px; font-weight: 600; line-height: 17px; text-align: center; }
+.hr-cell-sub { font-size: 11.5px; color: var(--muted); margin-top: 3px; white-space: nowrap; }
+@media (max-width: 760px) {
+  .hr-leave-filters { width: 100%; justify-content: space-between; }
+}
+
+/* Approval rows become cards on phones, so Approve / Reject are always on screen */
+@media (max-width: 760px) {
+  .hr-table-cards thead { display: none; }
+  .hr-table-cards, .hr-table-cards tbody { display: block; width: 100%; }
+  .hr-table-cards tbody tr { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .hr-table-cards tbody tr:last-child { border-bottom: 0; }
+  .hr-table-cards tbody td { display: block; padding: 0 !important; border: 0; white-space: normal !important; }
+  .hr-table-cards tbody td:first-child, .hr-table-cards td.is-reason, .hr-table-cards td.is-actions { grid-column: 1 / -1; }
+  .hr-table-cards td[data-label]:not([data-label=""])::before { content: attr(data-label); display: block; font-size: 11px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--subtle); margin-bottom: 2px; }
+  .hr-table-cards td.is-reason .hr-truncate { max-width: none !important; white-space: normal; }
+  .hr-table-cards td.is-actions { text-align: left; }
+  .hr-table-cards td.is-actions .hr-row-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .hr-table-cards td.is-actions .hr-btn { height: 40px; justify-content: center; }
+  .hr-table-cards td[colspan] { grid-column: 1 / -1; }
+  .hr-table-cards tbody tr:has(td[colspan]) { display: block; padding: 0; }
+}

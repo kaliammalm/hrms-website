@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -18,5 +19,8 @@
     "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.24.3",
     "sequelize": "^6.37.8"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

@@ -1,0 +1,110 @@
+# Builds the RRD Group HRMS Android app (APK) on GitHub's servers.
+# Run it: GitHub → Actions → "Build Android APK" → Run workflow.
+# Download: the run's "Artifacts" section, or the "Latest Android build" release (manual runs).
+name: Build Android APK
+
+on:
+  workflow_dispatch:            # the one-click "Run workflow" button
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'android/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'capacitor.config.ts'
+      - '.github/workflows/android-apk.yml'
+
+permissions:
+  contents: write               # needed to publish the release with the APK
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # The web app is built into the APK; this is the backend it talks to.
+      # Override with a repository variable API_URL (Settings → Secrets and variables → Actions → Variables).
+      REACT_APP_API_URL: ${{ vars.API_URL || 'https://hrms-backend-v3.onrender.com' }}
+      CI: false                 # stop Create React App treating lint warnings as errors
+
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install packages
+        run: npm ci || npm install   # falls back if package-lock.json is out of date
+
+      - name: Build the web app
+        run: npm run build
+
+      - name: Restore Capacitor's Cordova plugin project if missing
+        # android/.gitignore excludes this folder, so a fresh checkout does not have it
+        run: |
+          DIR=android/capacitor-cordova-android-plugins
+          if [ ! -f "$DIR/build.gradle" ]; then
+            mkdir -p "$DIR"
+            tar -xzf node_modules/@capacitor/cli/assets/capacitor-cordova-android-plugins.tar.gz -C "$DIR"
+            echo "Restored $DIR from the Capacitor template"
+          fi
+
+      - name: Copy the web app into the Android project
+        run: npx cap sync android
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Number this build
+        # Each build gets a higher versionCode so phones install it as an update
+        run: |
+          sed -i -E "s/versionCode [0-9]+/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          sed -i -E "s/versionName \"([0-9.]+)\"/versionName \"\1.${{ github.run_number }}\"/" android/app/build.gradle
+          grep -E "versionCode|versionName" android/app/build.gradle
+
+      - name: Build the APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Name the APK
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/debug/app-debug.apk "dist/RRD-Group-HRMS-build-${{ github.run_number }}.apk"
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/RRD-Group-HRMS.apk   # fixed name for the release link
+          ls -la dist
+
+      - name: Attach the APK to this run
+        uses: actions/upload-artifact@v4
+        with:
+          name: RRD-Group-HRMS-build-${{ github.run_number }}
+          path: dist/RRD-Group-HRMS-build-${{ github.run_number }}.apk
+          retention-days: 30
+
+      - name: Publish as the "Latest Android build" release
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-latest
+          name: Latest Android build
+          make_latest: true
+          body: |
+            Build ${{ github.run_number }} from commit ${{ github.sha }}.
+            Backend: ${{ env.REACT_APP_API_URL }}
+            Debug build: for testing. Install by opening the APK and allowing "Install unknown apps".
+          files: dist/RRD-Group-HRMS.apk

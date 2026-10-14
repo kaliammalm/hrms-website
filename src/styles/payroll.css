@@ -146,3 +146,47 @@
 }
 
 .py-retry { display: flex; justify-content: center; padding: 0 16px 20px; }
+
+/* ----- Salary transfer (direct payout) ------------------------------------ prefix st- */
+.st-panel .hr-panel-body { display: flex; flex-direction: column; gap: 14px; }
+.st-problem { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 10px; background: var(--warning-bg); color: var(--warning); font-size: var(--fs-sm); line-height: 1.5; }
+.st-problem svg { flex: none; margin-top: 2px; }
+.st-problem ul { margin: 6px 0 0; padding-left: 18px; }
+.st-2fa { display: flex; gap: 12px; padding: 14px 16px; border-radius: 10px; border: 1px solid var(--primary-100); background: var(--primary-50); color: var(--ink); }
+.st-2fa > svg { flex: none; color: var(--primary); margin-top: 2px; }
+.st-2fa-body { display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); min-width: 0; }
+.st-2fa-body p { margin: 0; color: var(--text-2); line-height: 1.5; }
+.st-2fa-body .hr-btn { align-self: flex-start; }
+.st-key { display: inline-block; padding: 8px 12px; border-radius: 8px; background: var(--surface); border: 1px dashed var(--line-strong); font-family: ui-monospace, Menlo, monospace; font-size: 15px; letter-spacing: .06em; word-break: break-all; align-self: flex-start; }
+.st-inline { display: flex; gap: 8px; flex-wrap: wrap; }
+.st-code { width: 130px; font-variant-numeric: tabular-nums; letter-spacing: .15em; }
+.st-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.st-stat { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); }
+.st-stat span { font-size: var(--fs-xs); color: var(--muted); }
+.st-stat strong { font-size: var(--fs-xl); color: var(--ink); font-variant-numeric: tabular-nums; }
+.st-stat em { font-style: normal; font-size: var(--fs-xs); color: var(--subtle); font-variant-numeric: tabular-nums; }
+.st-stat.is-ready strong { color: var(--primary); }
+.st-stat.is-blocked strong { color: var(--warning); }
+.st-stat.is-paid strong { color: var(--success); }
+.st-batch { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+.st-batch.is-pending { border-color: #f1d7a4; background: #fffcf5; }
+.st-batch-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.st-batch-head > svg { flex: none; color: var(--muted); }
+.st-batch-head > div { display: flex; flex-direction: column; flex: 1; min-width: 180px; font-size: var(--fs-sm); }
+.st-batch-head span { color: var(--muted); font-size: var(--fs-xs); }
+.st-approve { display: grid; grid-template-columns: minmax(0, 1fr) 160px auto; gap: 10px; align-items: end; }
+.st-override { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.st-override .hr-input:first-child { flex: 1 1 180px; }
+.st-table td { vertical-align: top; }
+.st-name { font-weight: 600; color: var(--ink); }
+.st-acct { font-family: ui-monospace, Menlo, monospace; font-size: 12px; white-space: nowrap; }
+.st-acct span { display: block; color: var(--subtle); }
+.st-why { font-size: var(--fs-xs); color: var(--text-2); max-width: 420px; }
+.st-why > span { display: block; line-height: 1.45; }
+.st-why .st-ok { color: var(--success); display: inline-flex; align-items: center; gap: 4px; }
+.st-why .st-bad { color: var(--danger); }
+.st-why .st-warn { color: var(--warning); }
+@media (max-width: 860px) {
+  .st-summary { grid-template-columns: 1fr 1fr; }
+  .st-approve { grid-template-columns: 1fr; }
+}

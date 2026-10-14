@@ -1,0 +1,138 @@
+--- a/backend/index.js
++++ b/backend/index.js
+@@ -6,7 +6,8 @@
+ 
+ const app = express();
+ 
+-app.use(express.json({ limit: '4mb' })); // ad-hoc visit photos arrive as base64 (max 2.5 MB)
++// ad-hoc visit photos arrive as base64 (max 2.5 MB). rawBody = exact bytes, needed to check payout webhook signatures
++app.use(express.json({ limit: '4mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
+ app.use(cors({ exposedHeaders: ['Content-Disposition'] })); // lets the web/Android app read report file names
+ 
+ // Database: environment variables on Render, local defaults on your laptop
+@@ -108,6 +109,9 @@
+ app.use('/api', require('./extraRoutes')(db, authenticate));
+ // Payroll: salary structures, statutory deductions, runs, bank file, payslips (needs scripts/add-payroll.js)
+ app.use('/api', require('./payroll/payrollRoutes')(db, authenticate));
++// Salary payouts: pay an approved run into employees' bank accounts (RazorpayX). Off unless PAYOUTS_ENABLED=true.
++// Needs scripts/add-payouts.js. Maker (MD/CEO) prepares, a different approver releases with an authenticator code.
++app.use('/api', require('./payouts/payoutRoutes')(db, authenticate).router);
+ 
+ // Start Server
+ const PORT = process.env.PORT || 5000;
+--- a/backend/payroll/payrollRoutes.js
++++ b/backend/payroll/payrollRoutes.js
+@@ -517,6 +517,7 @@
+   router.post('/pay/runs/:id/reopen', authenticate, needSchema, wrap(async (req, res) => {
+     const run = await loadRun(req, res, { manage: true, statuses: ['APPROVED'] });
+     if (!run) return;
++    if ((await activePayouts(run.id)).length) return res.status(409).json({ error: 'Salary transfers for this run are already paid or waiting for approval. Cancel the waiting batch first; paid transfers cannot be undone by reopening.' });
+     await q("UPDATE pay_runs SET status = 'DRAFT', approved_by = NULL, approved_at = NULL, updated_at = ? WHERE id = ?", [nowSql(), run.id]);
+     await q("UPDATE payslips SET status = 'Pending' WHERE month = ? AND company_id = ?", [periodLabel(run.period), run.company_id]).catch(() => {});
+     res.json({ message: 'Run reopened. Payslips are hidden from employees until it is approved again.' });
+@@ -525,6 +526,8 @@
+   router.post('/pay/runs/:id/mark-paid', authenticate, needSchema, wrap(async (req, res) => {
+     const run = await loadRun(req, res, { manage: true, statuses: ['APPROVED'] });
+     if (!run) return;
++    const open = (await activePayouts(run.id)).filter((p) => p.status !== 'processed');
++    if (open.length) return res.status(409).json({ error: `${open.length} direct salary transfer(s) are still waiting for approval or with the bank. The run becomes Paid by itself when they finish.` });
+     const date = String(req.body?.paymentDate || '');
+     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Enter the payment date.' });
+     const ref = String(req.body?.reference || '').trim().slice(0, 80) || null;
+@@ -541,6 +544,14 @@
+     res.json({ message: 'Draft run deleted.' });
+   }));
+ 
++  // Direct salary transfers (backend/payouts) of this run that are paid or still with the bank.
++  // Empty when the payouts module is not installed.
++  const activePayouts = async (runId) => {
++    try {
++      return await q("SELECT p.run_item_id, p.status, b.status AS batch_status FROM payout_items p JOIN payout_batches b ON b.id = p.batch_id WHERE p.run_id = ? AND p.active_run_item IS NOT NULL", [runId]);
++    } catch (e) { return []; }
++  };
++
+   // ======================================================================
+   // Bank transfer file
+   // ======================================================================
+@@ -549,8 +560,11 @@
+     const items = await q('SELECT * FROM pay_run_items WHERE run_id = ? ORDER BY emp_name', [run.id]);
+     const debitBankCode = String(settings.debit_ifsc || '').slice(0, 4);
+     const included = []; const excluded = [];
++    const direct = new Map((await activePayouts(run.id)).map((p) => [Number(p.run_item_id), p]));
+     items.forEach((i) => {
+       const why = [];
++      const d = direct.get(Number(i.id));
++      if (d) why.push(d.status === 'processed' ? 'already paid by direct transfer' : 'direct transfer in progress'); // never pay twice through two channels
+       if (Number(i.on_hold)) why.push('on hold');
+       if (!(num(i.net_pay) > 0)) why.push('no net pay');
+       if (!/^\d{6,20}$/.test(String(i.account_number || ''))) why.push('missing or invalid account number');
+--- a/src/payroll/PayrollModule.js
++++ b/src/payroll/PayrollModule.js
+@@ -13,6 +13,7 @@
+ } from 'lucide-react';
+ import { PageHeader, Panel, KpiStrip, Kpi, EmptyState, StatusPill, Field } from '../ui';
+ import { payFetch, inr, periodLabel, currentPeriod, shiftPeriod, saveBlob, downloadFromApi } from './payrollApi';
++import SalaryTransfer from './SalaryTransfer';
+ import '../styles/payroll.css';
+ 
+ const COMPANIES = [{ id: 1, name: 'Ram Reddy Developers' }, { id: 2, name: 'Fractio Hospitality' }, { id: 3, name: 'Stories by Varnam' }];
+@@ -267,6 +268,9 @@
+       )}
+       {run.status === 'PAID' && <div className="py-paid-note"><CircleCheck size={15} /> Paid on {run.paidAt}{run.paymentRef ? ` · reference ${run.paymentRef}` : ''}</div>}
+ 
++      {/* Direct salary transfer (RazorpayX): verify accounts → prepare → approve with 2FA → track */}
++      {!draft && <SalaryTransfer runId={runId} notify={notify} onRunChanged={load} />}
++
+       {paid.open && (
+         <div className="py-inline-form">
+           <Field label="Payment date"><input type="date" className="hr-input" value={paid.date} onChange={(e) => setPaid((x) => ({ ...x, date: e.target.value }))} /></Field>
+--- a/src/styles/payroll.css
++++ b/src/styles/payroll.css
+@@ -146,3 +146,47 @@
+ }
+ 
+ .py-retry { display: flex; justify-content: center; padding: 0 16px 20px; }
++
++/* ----- Salary transfer (direct payout) ------------------------------------ prefix st- */
++.st-panel .hr-panel-body { display: flex; flex-direction: column; gap: 14px; }
++.st-problem { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 10px; background: var(--warning-bg); color: var(--warning); font-size: var(--fs-sm); line-height: 1.5; }
++.st-problem svg { flex: none; margin-top: 2px; }
++.st-problem ul { margin: 6px 0 0; padding-left: 18px; }
++.st-2fa { display: flex; gap: 12px; padding: 14px 16px; border-radius: 10px; border: 1px solid var(--primary-100); background: var(--primary-50); color: var(--ink); }
++.st-2fa > svg { flex: none; color: var(--primary); margin-top: 2px; }
++.st-2fa-body { display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); min-width: 0; }
++.st-2fa-body p { margin: 0; color: var(--text-2); line-height: 1.5; }
++.st-2fa-body .hr-btn { align-self: flex-start; }
++.st-key { display: inline-block; padding: 8px 12px; border-radius: 8px; background: var(--surface); border: 1px dashed var(--line-strong); font-family: ui-monospace, Menlo, monospace; font-size: 15px; letter-spacing: .06em; word-break: break-all; align-self: flex-start; }
++.st-inline { display: flex; gap: 8px; flex-wrap: wrap; }
++.st-code { width: 130px; font-variant-numeric: tabular-nums; letter-spacing: .15em; }
++.st-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
++.st-stat { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); }
++.st-stat span { font-size: var(--fs-xs); color: var(--muted); }
++.st-stat strong { font-size: var(--fs-xl); color: var(--ink); font-variant-numeric: tabular-nums; }
++.st-stat em { font-style: normal; font-size: var(--fs-xs); color: var(--subtle); font-variant-numeric: tabular-nums; }
++.st-stat.is-ready strong { color: var(--primary); }
++.st-stat.is-blocked strong { color: var(--warning); }
++.st-stat.is-paid strong { color: var(--success); }
++.st-batch { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
++.st-batch.is-pending { border-color: #f1d7a4; background: #fffcf5; }
++.st-batch-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
++.st-batch-head > svg { flex: none; color: var(--muted); }
++.st-batch-head > div { display: flex; flex-direction: column; flex: 1; min-width: 180px; font-size: var(--fs-sm); }
++.st-batch-head span { color: var(--muted); font-size: var(--fs-xs); }
++.st-approve { display: grid; grid-template-columns: minmax(0, 1fr) 160px auto; gap: 10px; align-items: end; }
++.st-override { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
++.st-override .hr-input:first-child { flex: 1 1 180px; }
++.st-table td { vertical-align: top; }
++.st-name { font-weight: 600; color: var(--ink); }
++.st-acct { font-family: ui-monospace, Menlo, monospace; font-size: 12px; white-space: nowrap; }
++.st-acct span { display: block; color: var(--subtle); }
++.st-why { font-size: var(--fs-xs); color: var(--text-2); max-width: 420px; }
++.st-why > span { display: block; line-height: 1.45; }
++.st-why .st-ok { color: var(--success); display: inline-flex; align-items: center; gap: 4px; }
++.st-why .st-bad { color: var(--danger); }
++.st-why .st-warn { color: var(--warning); }
++@media (max-width: 860px) {
++  .st-summary { grid-template-columns: 1fr 1fr; }
++  .st-approve { grid-template-columns: 1fr; }
++}

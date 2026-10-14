@@ -10,8 +10,10 @@ def signingValue = { String envName, String propName -> System.getenv(envName) ?
 def releaseStoreFile = signingValue('ANDROID_KEYSTORE_PATH', 'storeFile')
 def hasReleaseSigning = releaseStoreFile != null && file(releaseStoreFile).exists()
 
-// Build number: CI sets VERSION_CODE (the workflow run number); local builds stay at 1
-def buildNumber = (System.getenv('VERSION_CODE') ?: '1').toInteger()
+// Build number (must go up with every APK you share, or phones refuse the update):
+//   Android Studio: appVersionCode in android/gradle.properties (raise it by 1 before each release build)
+//   GitHub Actions: the VERSION_CODE env var wins when set
+def buildNumber = (System.getenv('VERSION_CODE') ?: (project.findProperty('appVersionCode') ?: '1')).toString().toInteger()
 
 android {
     namespace = "com.rrdgroup.hrms"

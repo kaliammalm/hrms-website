@@ -6,7 +6,8 @@ const jwt = require('jsonwebtoken');
 
 const app = express();
 
-app.use(express.json({ limit: '4mb' })); // ad-hoc visit photos arrive as base64 (max 2.5 MB)
+// ad-hoc visit photos arrive as base64 (max 2.5 MB). rawBody = exact bytes, needed to check payout webhook signatures
+app.use(express.json({ limit: '4mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(cors({ exposedHeaders: ['Content-Disposition'] })); // lets the web/Android app read report file names
 
 // Database: environment variables on Render, local defaults on your laptop
@@ -108,6 +109,9 @@ app.use('/api', apiRoutes(db, authenticate, getLocalDateTime, calculateDistance,
 app.use('/api', require('./extraRoutes')(db, authenticate));
 // Payroll: salary structures, statutory deductions, runs, bank file, payslips (needs scripts/add-payroll.js)
 app.use('/api', require('./payroll/payrollRoutes')(db, authenticate));
+// Salary payouts: pay an approved run into employees' bank accounts (RazorpayX). Off unless PAYOUTS_ENABLED=true.
+// Needs scripts/add-payouts.js. Maker (MD/CEO) prepares, a different approver releases with an authenticator code.
+app.use('/api', require('./payouts/payoutRoutes')(db, authenticate).router);
 
 // Start Server
 const PORT = process.env.PORT || 5000;

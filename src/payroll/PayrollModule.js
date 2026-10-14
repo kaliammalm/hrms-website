@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { PageHeader, Panel, KpiStrip, Kpi, EmptyState, StatusPill, Field } from '../ui';
 import { payFetch, inr, periodLabel, currentPeriod, shiftPeriod, saveBlob, downloadFromApi } from './payrollApi';
+import SalaryTransfer from './SalaryTransfer';
 import '../styles/payroll.css';
 
 const COMPANIES = [{ id: 1, name: 'Ram Reddy Developers' }, { id: 2, name: 'Fractio Hospitality' }, { id: 3, name: 'Stories by Varnam' }];
@@ -266,6 +267,9 @@ function RunDetail({ runId, onBack, notify }) {
         <div className="py-actions"><button type="button" className="hr-btn hr-btn-secondary" onClick={allSlips} disabled={!!busy}><FileText size={15} /> All payslips (PDF)</button></div>
       )}
       {run.status === 'PAID' && <div className="py-paid-note"><CircleCheck size={15} /> Paid on {run.paidAt}{run.paymentRef ? ` · reference ${run.paymentRef}` : ''}</div>}
+
+      {/* Direct salary transfer (RazorpayX): verify accounts → prepare → approve with 2FA → track */}
+      {!draft && <SalaryTransfer runId={runId} notify={notify} onRunChanged={load} />}
 
       {paid.open && (
         <div className="py-inline-form">

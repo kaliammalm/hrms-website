@@ -70,12 +70,14 @@ module.exports = function payrollRoutes(db, authenticate) {
   };
 
   let ready = false;
+  let reason = '';
   const needSchema = wrap(async (req, res, next) => {
     if (!ready) {
-      try { await q('SELECT 1 FROM pay_runs LIMIT 1'); await q('SELECT 1 FROM pay_settings LIMIT 1'); ready = true; } catch (e) { /* not migrated */ }
+      try { await q('SELECT 1 FROM pay_runs LIMIT 1'); await q('SELECT 1 FROM pay_settings LIMIT 1'); ready = true; } catch (e) { reason = e.sqlMessage || e.message || ''; }
     }
     if (ready) return next();
-    return res.status(503).json({ error: 'Payroll is not set up yet. Run: node scripts/add-payroll.js --apply' });
+    // The database's own message (e.g. "Table 'hrms.pay_runs' doesn't exist") shows which database the server is using
+    return res.status(503).json({ error: `Payroll is not set up on this server's database yet. Run: node scripts/add-payroll.js --apply with the same DB_* values as the server.${reason ? ` (Database says: ${reason})` : ''}` });
   });
 
   // ---------------------------------------------------------------- data helpers
@@ -515,6 +517,7 @@ module.exports = function payrollRoutes(db, authenticate) {
   router.post('/pay/runs/:id/reopen', authenticate, needSchema, wrap(async (req, res) => {
     const run = await loadRun(req, res, { manage: true, statuses: ['APPROVED'] });
     if (!run) return;
+    if ((await activePayouts(run.id)).length) return res.status(409).json({ error: 'Salary transfers for this run are already paid or waiting for approval. Cancel the waiting batch first; paid transfers cannot be undone by reopening.' });
     await q("UPDATE pay_runs SET status = 'DRAFT', approved_by = NULL, approved_at = NULL, updated_at = ? WHERE id = ?", [nowSql(), run.id]);
     await q("UPDATE payslips SET status = 'Pending' WHERE month = ? AND company_id = ?", [periodLabel(run.period), run.company_id]).catch(() => {});
     res.json({ message: 'Run reopened. Payslips are hidden from employees until it is approved again.' });
@@ -523,6 +526,8 @@ module.exports = function payrollRoutes(db, authenticate) {
   router.post('/pay/runs/:id/mark-paid', authenticate, needSchema, wrap(async (req, res) => {
     const run = await loadRun(req, res, { manage: true, statuses: ['APPROVED'] });
     if (!run) return;
+    const open = (await activePayouts(run.id)).filter((p) => p.status !== 'processed');
+    if (open.length) return res.status(409).json({ error: `${open.length} direct salary transfer(s) are still waiting for approval or with the bank. The run becomes Paid by itself when they finish.` });
     const date = String(req.body?.paymentDate || '');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Enter the payment date.' });
     const ref = String(req.body?.reference || '').trim().slice(0, 80) || null;
@@ -539,6 +544,14 @@ module.exports = function payrollRoutes(db, authenticate) {
     res.json({ message: 'Draft run deleted.' });
   }));
 
+  // Direct salary transfers (backend/payouts) of this run that are paid or still with the bank.
+  // Empty when the payouts module is not installed.
+  const activePayouts = async (runId) => {
+    try {
+      return await q("SELECT p.run_item_id, p.status, b.status AS batch_status FROM payout_items p JOIN payout_batches b ON b.id = p.batch_id WHERE p.run_id = ? AND p.active_run_item IS NOT NULL", [runId]);
+    } catch (e) { return []; }
+  };
+
   // ======================================================================
   // Bank transfer file
   // ======================================================================
@@ -547,8 +560,11 @@ module.exports = function payrollRoutes(db, authenticate) {
     const items = await q('SELECT * FROM pay_run_items WHERE run_id = ? ORDER BY emp_name', [run.id]);
     const debitBankCode = String(settings.debit_ifsc || '').slice(0, 4);
     const included = []; const excluded = [];
+    const direct = new Map((await activePayouts(run.id)).map((p) => [Number(p.run_item_id), p]));
     items.forEach((i) => {
       const why = [];
+      const d = direct.get(Number(i.id));
+      if (d) why.push(d.status === 'processed' ? 'already paid by direct transfer' : 'direct transfer in progress'); // never pay twice through two channels
       if (Number(i.on_hold)) why.push('on hold');
       if (!(num(i.net_pay) > 0)) why.push('no net pay');
       if (!/^\d{6,20}$/.test(String(i.account_number || ''))) why.push('missing or invalid account number');

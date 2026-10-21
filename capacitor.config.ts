@@ -4,7 +4,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 // no new APK is needed for screen or feature changes. A new APK is only needed when
 // native parts change (app icon, permissions, Capacitor plugins).
 // To go back to the bundled build, delete the `server` block and rebuild the APK.
-const LIVE_URL = 'https://hrms-website-three.vercel.app';
+const LIVE_URL = 'https://hrms.ramreddydevelopers.com';ss
 
 const config: CapacitorConfig = {
   appId: 'com.rrdgroup.hrms',
